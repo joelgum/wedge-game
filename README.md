@@ -1,5 +1,9 @@
 # WEDGE! — 8-bit bodyboarding arcade game
 
+![WEDGE! title screen](assets/title.png)
+
+**[Play it live →](https://wedge-game.vercel.app)**
+
 An NES-style arcade game in one continuous view: you float in the lineup at The Wedge,
 waves build behind the riders and peel left to right, and you read each one — track the
 shifting takeoff spot on makeable waves, let the closeouts pass, and hold the pocket
@@ -48,6 +52,9 @@ the moving pocket).
 
 ## Status
 
-Playable end to end with placeholder procedural sprites. Outstanding: Midjourney /
-Aseprite art pass (PLAN.md §5), difficulty tuning, phone playtest, deployment.
+Playable end to end with full sprite/backdrop art, bot-verified difficulty tuning, and
+mobile touch controls. Live at [wedge-game.vercel.app](https://wedge-game.vercel.app)
+(standalone deploy repo: [github.com/joelgum/wedge-game](https://github.com/joelgum/wedge-game)).
+See [MARKETABILITY_PLAN.md](MARKETABILITY_PLAN.md) for the onboarding/retention/skill-ceiling
+upgrade spec and its phase status.
 `window.__wedge` is a debug handle used for automated testing.
