@@ -3,6 +3,7 @@
 class AudioSys {
   constructor() {
     try { this.musicMuted = localStorage.getItem('wedge-muted') === '1'; } catch (e) { this.musicMuted = false; }
+    try { this.mutedAll = localStorage.getItem('wedge-muted-all') === '1'; } catch (e) { this.mutedAll = false; }
     this.musicWanted = false;
   }
 
@@ -10,7 +11,16 @@ class AudioSys {
     this.musicMuted = !this.musicMuted;
     try { localStorage.setItem('wedge-muted', this.musicMuted ? '1' : '0'); } catch (e) { /* private mode */ }
     if (this.musicMuted) this._halt();
-    else if (this.musicWanted) this._begin();
+    else if (this.musicWanted && !this.mutedAll) this._begin();
+  }
+
+  // master mute — the on-screen button on mobile (M-key only toggles music). Silences
+  // music AND sfx by gating tone()/noise() below and halting the music scheduler.
+  toggleMute() {
+    this.mutedAll = !this.mutedAll;
+    try { localStorage.setItem('wedge-muted-all', this.mutedAll ? '1' : '0'); } catch (e) { /* private mode */ }
+    if (this.mutedAll) this._halt();
+    else if (this.musicWanted && !this.musicMuted) this._begin();
   }
 
   ensure() {
@@ -30,7 +40,7 @@ class AudioSys {
   }
 
   tone(f, dur, { type = 'square', vol = 0.12, delay = 0, slide = 0 } = {}) {
-    if (!this.ctx) return;
+    if (!this.ctx || this.mutedAll) return;
     const t = this.ctx.currentTime + Math.max(0, delay);
     const o = this.ctx.createOscillator(), g = this.ctx.createGain();
     o.type = type;
@@ -43,7 +53,7 @@ class AudioSys {
   }
 
   noise(dur, { vol = 0.2, delay = 0 } = {}) {
-    if (!this.ctx) return;
+    if (!this.ctx || this.mutedAll) return;
     const t = this.ctx.currentTime + Math.max(0, delay);
     const n = Math.floor(this.ctx.sampleRate * dur);
     const buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate);
@@ -68,7 +78,7 @@ class AudioSys {
 
   startMusic() {
     this.musicWanted = true;
-    if (!this.musicMuted) this._begin();
+    if (!this.musicMuted && !this.mutedAll) this._begin();
   }
   _begin() {
     if (this.musicOn || !this.ctx) return;

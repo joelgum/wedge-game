@@ -1,6 +1,14 @@
 // Keyboard + touch input. Touch: the finger is the controller — the game reads
 // input.touch (canvas coords) for direct positional control; a quick tap = A button.
-import { audio } from './audio.js?v=3';
+import { audio } from './audio.js?v=4';
+
+// on-screen master-mute button (bottom-right corner, canvas coords). Drawn in main.js;
+// hit-tested here so a tap on it toggles audio instead of counting as the A button.
+export const MUTE_RECT = { x: 234, y: 221, w: 20, h: 18 };
+function inMute(p) {
+  const r = MUTE_RECT;
+  return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+}
 
 const KEYMAP = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
@@ -75,10 +83,14 @@ function touchEnd(e) {
     input.touch.active = false;
     input.touch.dragging = false;
     input.touch.dx = 0; input.touch.dy = 0;
-    // quick tap without dragging = A button (generous thumb-wobble budget)
+    // quick tap without dragging = A button — unless it landed on the mute button
     if (tapStart && !tapStart.moved && performance.now() - tapStart.time < 500) {
-      input.press('a');
-      setTimeout(() => input.release('a'), 150);
+      if (inMute(canvasPos({ clientX: tapStart.x, clientY: tapStart.y }))) {
+        audio.ensure(); audio.toggleMute();
+      } else {
+        input.press('a');
+        setTimeout(() => input.release('a'), 150);
+      }
     }
     tapStart = null;
   } else {
@@ -88,3 +100,10 @@ function touchEnd(e) {
 }
 addEventListener('touchend', touchEnd, { passive: false });
 addEventListener('touchcancel', touchEnd, { passive: false });
+
+// desktop: the mute button is clickable too (keyboard still has M for music-only)
+addEventListener('mousedown', (e) => {
+  if (inMute(canvasPos({ clientX: e.clientX, clientY: e.clientY }))) {
+    e.preventDefault(); audio.ensure(); audio.toggleMute();
+  }
+});

@@ -1,7 +1,7 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
-import { input } from './input.js?v=3';
-import { audio } from './audio.js?v=3';
+import { input } from './input.js?v=4';
+import { audio } from './audio.js?v=4';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
 import { mulberry32, hashStr } from './rng.js?v=1';
@@ -329,6 +329,9 @@ export function makeScenes(game) {
       this.committed = false;
       this.rumbled = false;
       this.holdT = 0;   // brief peak-drift freeze while a teaching callout is up (Phase 1)
+      this.moveT = 0;           // >0 while repositioning, so the rider shows prone (not sitting)
+      this.isBomb = false;      // set true when you commit to a monster — drives the instant replay
+      this.recording = false; this.recBuf = null;
       this.mode = 'watch';
     },
 
@@ -348,10 +351,16 @@ export function makeScenes(game) {
       if (this.msgT > 0) this.msgT -= dt;
       for (const f of this.floaters) { f.t -= dt; f.y -= 14 * dt; }
       this.floaters = this.floaters.filter((f) => f.t > 0);
-      if (this.mode === 'watch') this.updateWatch(dt);
-      else if (this.mode === 'ride') this.updateRide(dt);
-      else if (this.mode === 'exit') this.updateExit(dt);
+      if (this.mode === 'replayPrompt') { this.updateReplayPrompt(dt); return; }
+      if (this.mode === 'replay') { this.updateReplay(dt); return; }
+      const m = this.mode;
+      if (m === 'watch') this.updateWatch(dt);
+      else if (m === 'ride') this.updateRide(dt);
+      else if (m === 'exit') this.updateExit(dt);
       else this.updatePitch(dt);
+      // record the bomb's drop+ride frame-by-frame (only while still in that phase, so the
+      // completing frame that flips to exit/wipeout isn't captured) — see startReplayPrompt
+      if (this.recording && this.mode === m && (m === 'ride' || m === 'pitch')) this.recSnap(m);
     },
 
     updateWatch(dt) {
@@ -390,12 +399,16 @@ export function makeScenes(game) {
         audio.noise(0.7, { vol: 0.05 });
       }
       if (!this.committed) {
+        const prevPx = this.px;
         if (input.held('left')) this.px -= 85 * dt;
         if (input.held('right')) this.px += 85 * dt;
         // relative slide: the rider moves by how far you slide, never jumps to the finger
         if (input.touch.active && input.touch.dragging) this.px += input.touch.dx * 1.5;
         input.touch.dx = 0;
         this.px = Math.max(24, Math.min(232, this.px));
+        // paddling to reposition: any left/right movement drops the rider prone (a short
+        // linger holds the pose through tiny pauses) before the auto-paddle at stand-up
+        this.moveT = Math.abs(this.px - prevPx) > 0.05 ? 0.35 : Math.max(0, (this.moveT || 0) - dt);
         // commit = catch THIS wave, right where you are, right now
         if (input.pressed('a') && this.q() > 0.25) {
           this.committed = true;
@@ -415,9 +428,11 @@ export function makeScenes(game) {
         else if (w.makeable) { this.say('WAVE WASTED', 'THAT ONE WAS A RUNNER'); this.recordAndAdvance('waste'); }
         else { game.score += 150; this.say('GOOD CALL', 'CLOSEOUT — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
       } else if (w.monster) {
-        // a rideable BOMB: nail the slot and you ride the wave of the day; miss and you're pitched
-        if (w.rideable && d <= tol) this.rideBomb();
-        else this.startPitch();   // off-slot bomb, or a plain trap monster — over the falls
+        // committing to a bomb — the clip moment. Record the drop+ride so we can offer an
+        // instant replay whether it's a made ride or a pitched wipeout (see updateExit/Pitch).
+        this.isBomb = true;
+        if (w.rideable && d <= tol) { this.rideBomb(); this.beginRecord('ride'); }
+        else { this.startPitch(); this.beginRecord('pitch'); }   // off-slot bomb / trap monster — over the falls
       } else if (!w.makeable) {
         game.goto('wipeout', { reason: 'CLOSED OUT!', detail: 'THAT WAVE WAS A WALL — NO EXIT',
           mark: { px: this.px, wall: true } });
@@ -534,6 +549,7 @@ export function makeScenes(game) {
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
       if (this.pT >= this.pDur) {
+        if (this.isBomb) { this.startReplayPrompt(() => game.goto('wipeout', { reason: 'OVER THE FALLS!', detail: 'TOO BIG — YOU GOT PITCHED' })); return; }
         game.goto('wipeout', { reason: 'OVER THE FALLS!', detail: 'TOO BIG — YOU GOT PITCHED' });
       }
     },
@@ -696,6 +712,7 @@ export function makeScenes(game) {
       }
 
       if (this.buried > 0.95) {
+        if (this.isBomb) { this.startReplayPrompt(() => game.goto('wipeout', { reason: 'BURIED!', detail: 'YOU LOST THE POCKET' })); return; }
         game.goto('wipeout', { reason: 'BURIED!', detail: 'YOU LOST THE POCKET' });
         return;
       }
@@ -760,14 +777,115 @@ export function makeScenes(game) {
       if (!this.exSplashed && this.exT > 0.9) { this.exSplashed = true; audio.crash(); }
       if (this.exT >= 2.9) {
         audio.jingle();
+        // a made bomb ran the full drop+ride — offer the instant replay before rolling on
+        if (this.isBomb) { this.startReplayPrompt(() => this.newWave()); return; }
         // daily grid was already recorded at ride completion; just end after wave 10
         if (game.daily && game.wave >= 10) game.goto('dailyresult', { dateKey: dailyKey(), dayNum: dailyNum() });
         else this.newWave();
       }
     },
 
+    // ---------------- instant replay (bomb waves) -------------------------------
+    // We record the drop+ride frame-by-frame as tiny numeric snapshots (not pixels), then
+    // re-drive the existing drawRide/drawPitch off those snapshots at half speed. The wave's
+    // constants (which don't change during the ride) are captured once in recConst.
+    beginRecord(mode) {
+      this.recMode = mode;
+      this.recording = true;
+      this.recBuf = [];
+      this.recConst = mode === 'ride'
+        ? { wv: this.wv, dropDur: this.dropDur, dropY0: this.dropY0, band: this.band,
+            pAmp: this.pAmp, lateAmp: this.lateAmp, pFreq: this.pFreq, pocketPh: this.pocketPh,
+            stage: game.stage }
+        : { wv: this.wv, lipX: this.lipX, takeX: this.takeX, pSpin: this.pSpin, stage: game.stage };
+    },
+    recSnap(mode) {
+      if (this.recBuf.length > 900) return;   // ~15s cap — a bomb never runs this long
+      this.recBuf.push(mode === 'ride'
+        ? { foamX: this.foamX, animT: this.animT, rt: this.rt, py: this.py,
+            dropT: this.dropT, spinT: this.spinT, buried: this.buried, tubeTime: this.tubeTime }
+        : { pT: this.pT, animT: this.animT, shake: this.shake, pSmashed: this.pSmashed });
+    },
+    // Offer the replay. `next` is the normal flow (newWave / goto wipeout) run once we're done.
+    startReplayPrompt(next) {
+      this.recording = false;
+      this.replayNext = next;
+      if (!this.recBuf || this.recBuf.length < 4) { next(); return; }   // nothing worth showing
+      this._liveStage = game.stage;   // restored when the replay ends
+      this.mode = 'replayPrompt';
+      this.promptT = 0;
+      audio.select();
+    },
+    updateReplayPrompt(dt) {
+      this.promptT += dt;
+      if (this.promptT < 0.35) return;   // brief guard so a lingering tap/press isn't consumed
+      if (input.pressed('a')) { this.startReplay(); return; }
+      if (input.pressed('b') || input.pressed('down') || input.pressed('start') || this.promptT > 8) {
+        this.finishReplay();
+      }
+    },
+    startReplay() {
+      this.mode = 'replay';
+      this.rpi = 0;    // frame index into recBuf, advanced at half real-time
+      this.rpT = 0;    // wall-clock since replay started (gates the skip)
+      game.stage = this.recConst.stage;
+    },
+    updateReplay(dt) {
+      this.rpT += dt;
+      this.rpi += 60 * dt * 0.5;   // 0.5× playback
+      if (this.rpi >= this.recBuf.length - 1) { this.finishReplay(); return; }
+      if (this.rpT > 0.4 && (input.pressed('a') || input.pressed('b') || input.pressed('start'))) {
+        this.finishReplay();
+      }
+    },
+    finishReplay() {
+      if (this._liveStage !== undefined) game.stage = this._liveStage;
+      this._liveStage = undefined;
+      this.recBuf = null; this.recording = false; this.isBomb = false;
+      const next = this.replayNext; this.replayNext = null;
+      this.mode = 'watch';   // placeholder; next() sets the real destination
+      if (next) next();
+    },
+    // Redraw a recorded frame by restoring its state onto `this` and calling the live draw fn.
+    drawReplay(ctx) {
+      const buf = this.recBuf;
+      const idx = this.mode === 'replayPrompt' ? buf.length - 1 : Math.min(Math.floor(this.rpi), buf.length - 1);
+      const c = this.recConst;
+      const p = PALETTES[c.stage];
+      const bgKey = BG_KEYS[c.stage];
+      if (imgReady(bgKey)) ctx.drawImage(IMG[bgKey], 0, 0, W, H);
+      else skyAndSea(ctx, p);
+      Object.assign(this, c);            // wave constants
+      Object.assign(this, buf[idx]);     // this frame's animated state
+      if (this.recMode === 'pitch' && this.shake > 0) {
+        ctx.save();
+        ctx.translate(Math.round((Math.random() * 2 - 1) * this.shake), Math.round((Math.random() * 2 - 1) * this.shake));
+        if (imgReady(bgKey)) ctx.drawImage(IMG[bgKey], -8, -8, W + 16, H + 16);
+        this.drawPitch(ctx, p);
+        ctx.restore();
+      } else if (this.recMode === 'ride') {
+        this.drawRide(ctx, p);
+      } else {
+        this.drawPitch(ctx, p);
+      }
+      // replay chrome: letterbox + label, and the prompt when we're waiting on the player
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, 0, W, 16); ctx.fillRect(0, H - 16, W, 16);
+      const blink = Math.floor(Date.now() / 250) % 2 === 0;   // wall-clock: snapshot animT is frozen on the prompt
+      if (blink) text(ctx, '▶▶ INSTANT REPLAY  0.5×', W / 2, 5, 8, '#f8f890', 'center');
+      if (this.mode === 'replayPrompt') {
+        ctx.fillStyle = 'rgba(8,8,32,0.72)';
+        ctx.fillRect(20, 100, W - 40, 42);
+        text(ctx, 'WATCH THE REPLAY?', W / 2, 106, 11, '#f8f8f8', 'center');
+        text(ctx, input.usedTouch ? 'TAP = YES        (WAIT = SKIP)' : 'X = YES        ↓ = SKIP', W / 2, 124, 8, '#f8d848', 'center');
+      } else {
+        text(ctx, input.usedTouch ? 'TAP TO SKIP' : 'X TO SKIP', W / 2, H - 13, 7, '#c8c8d8', 'center');
+      }
+    },
+
     // ---------------- draw
     draw(ctx) {
+      if (this.mode === 'replay' || this.mode === 'replayPrompt') { this.drawReplay(ctx); return; }
       const p = pal();
       // screen shake when the wave lands on a pitched wipeout — jitter the world layer,
       // overscan the backdrop so no black edge shows, keep the HUD steady
@@ -882,8 +1000,10 @@ export function makeScenes(game) {
       // player — lifted too as the wave arrives under you. Sitting in the lineup;
       // drops to a paddle/swim stance once the wave stands up.
       const py = LINEUP_Y + Math.sin(this.animT * 2.6) * 2 - this.waveH(this.px, q) * 0.25 * q * q;
-      if (!drawRiderImg(ctx, riderKey(paddling ? 'paddle' : 'sit'), this.px, py - 4, 0, 0)) {
-        drawMap(ctx, paddling && this.animT % 0.3 < 0.15 ? spr().paddleB : spr().paddleA, this.px - 16, py - 6, 2, true);
+      // prone the moment you slide to reposition; otherwise sit/tread until the wave stands up
+      const prone = paddling || this.moveT > 0;
+      if (!drawRiderImg(ctx, riderKey(prone ? 'paddle' : 'sit'), this.px, py - 4, 0, 0)) {
+        drawMap(ctx, prone && this.animT % 0.3 < 0.15 ? spr().paddleB : spr().paddleA, this.px - 16, py - 6, 2, true);
       }
       ctx.fillStyle = '#f8f890';
       ctx.fillRect(this.px - 1, py + 10, 3, 2); // you-marker under the player

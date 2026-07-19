@@ -1,8 +1,8 @@
 // Boot + fixed-timestep game loop at NES-native 256x240, integer-scaled.
 // ?v= querystrings bust stale module caches on phones; bump together in all files
-import { input } from './input.js?v=3';
-import { audio } from './audio.js?v=3';
-import { makeScenes } from './scenes.js?v=19';
+import { input, MUTE_RECT } from './input.js?v=4';
+import { audio } from './audio.js?v=4';
+import { makeScenes } from './scenes.js?v=20';
 
 const W = 256, H = 240;
 
@@ -13,7 +13,9 @@ const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
 function fit() {
-  const s = Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H)));
+  // fill the viewport: fractional scale (still nearest-neighbour via image-rendering:pixelated),
+  // so narrow phones no longer lock to a tiny 1× integer view
+  const s = Math.min(innerWidth / W, innerHeight / H);
   canvas.style.width = W * s + 'px';
   canvas.style.height = H * s + 'px';
 }
@@ -56,6 +58,30 @@ window.__wedge = { game, scenes, scene: () => scene, paused: () => paused };
 let scene;
 game.goto('title');
 
+// on-screen master-mute toggle (works on touch + mouse; keyboard M still toggles music).
+// Hit region lives in input.js (MUTE_RECT); this only draws it, on top of every scene.
+function drawMute(ctx) {
+  const r = MUTE_RECT;
+  ctx.fillStyle = 'rgba(8,8,32,0.5)';
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  const bx = r.x + 3, by = r.y + 4; // speaker body origin
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(bx, by + 3, 3, 4);                 // neck
+  ctx.fillRect(bx + 3, by, 4, 10);                // cone block
+  ctx.beginPath();
+  ctx.moveTo(bx + 7, by); ctx.lineTo(bx + 11, by - 3);
+  ctx.lineTo(bx + 11, by + 13); ctx.lineTo(bx + 7, by + 10);
+  ctx.closePath(); ctx.fill();
+  if (audio.mutedAll) {
+    ctx.strokeStyle = '#f85838'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(bx + 8, by - 1); ctx.lineTo(bx + 15, by + 11); ctx.stroke();
+  } else {
+    ctx.fillStyle = '#f8f8f8';                     // sound waves
+    ctx.fillRect(bx + 13, by + 1, 1, 8);
+    ctx.fillRect(bx + 15, by - 1, 1, 12);
+  }
+}
+
 const STEP = 1 / 60;
 let last = performance.now(), acc = 0;
 function frame(now) {
@@ -70,6 +96,7 @@ function frame(now) {
     ctx.fillText('PAUSED', W / 2, 96);
     ctx.font = "bold 8px 'Courier New', monospace";
     ctx.fillText('PRESS P TO RESUME', W / 2, 126);
+    drawMute(ctx);
     requestAnimationFrame(frame);
     return;
   }
@@ -81,6 +108,7 @@ function frame(now) {
     acc -= STEP;
   }
   scene.draw(ctx);
+  drawMute(ctx);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
