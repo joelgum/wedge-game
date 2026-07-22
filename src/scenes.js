@@ -102,6 +102,28 @@ function text(ctx, s, x, y, size = 8, color = '#fff', align = 'left') {
   ctx.fillText(s, Math.round(x), Math.round(y));
 }
 
+// Lighten (amt>0) or darken (amt<0) a '#rrggbb' colour — for looser, gradient-shaded
+// wave faces that roll from a dark pocket under the lip to a glassy lit base.
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const f = amt < 0 ? 1 + amt : 1, add = amt > 0 ? amt * 255 : 0;
+  r = Math.max(0, Math.min(255, Math.round(r * f + add)));
+  g = Math.max(0, Math.min(255, Math.round(g * f + add)));
+  b = Math.max(0, Math.min(255, Math.round(b * f + add)));
+  return `rgb(${r},${g},${b})`;
+}
+// Vertical face gradient from the crest line down to the waterline: dark in the pocket
+// under the pitching lip, glassy and lit toward the base.
+function faceGradient(ctx, topY, botY, pal) {
+  const g = ctx.createLinearGradient(0, topY, 0, botY + 4);
+  g.addColorStop(0, shade(pal.seaD, -0.28));
+  g.addColorStop(0.42, pal.seaD);
+  g.addColorStop(0.78, pal.sea);
+  g.addColorStop(1, shade(pal.sea, 0.14));
+  return g;
+}
+
 function skyAndSea(ctx, pal) {
   ctx.fillStyle = pal.skyTop; ctx.fillRect(0, 0, W, 64);
   ctx.fillStyle = pal.skyBot; ctx.fillRect(0, 64, W, 46);
@@ -333,6 +355,12 @@ export function makeScenes(game) {
       this.isBomb = false;      // set true when you commit to a monster — drives the instant replay
       this.recording = false; this.recBuf = null;
       this.mode = 'watch';
+      // interstitial NPC beat (~1 in 3, arcade only, after the teaching waves): one of
+      // the pack takes a quick extra wave while you watch — a walled one pitches and
+      // smashes them, a small one runs clean. Free wave-reading lessons between turns.
+      // Skipped in daily (fixed 10-wave cadence) and ahead of the bomb (its intro owns
+      // the drama). Your wave's clock (wv.t = 0) doesn't start until the beat ends.
+      if (!game.daily && game.wave >= 3 && !this.wv.rideable && Math.random() < 0.33) this.startNpc();
     },
 
     peakX() { return this.wv.peak; },
@@ -340,9 +368,31 @@ export function makeScenes(game) {
     q() { return Math.min(1, this.wv.t / this.wv.T); },
     waveH(x, q) {
       const w = this.wv;
-      let g = Math.exp(-(((x - this.peakX()) / w.sigma) ** 2));
+      const dx = x - this.peakX();
+      // The Wedge is an ASYMMETRIC A-frame, not a round swell: reflected energy off the
+      // jetty stacks the back (left) steep and short, while the shoulder (right) runs a
+      // longer open wall you ride down the line. Exponent < 2 gives a peaked, cusp-like
+      // apex (a wedge) instead of a rounded Gaussian hump.
+      const sig = dx < 0 ? w.sigma * 0.7 : w.sigma * 1.08;
+      let g = Math.exp(-Math.pow(Math.abs(dx) / sig, 1.4));
       if (!w.makeable) g = Math.min(1, g * 1.7);          // squared-off wall = closeout
-      return w.A * Math.pow(q, 1.4) * g;
+      // constructive interference: the reflected wedge crest surges the peak as it stacks
+      // in (see stackSurge), then is absorbed — the wave visibly jacks up mid-build.
+      g += this.stackSurge(x, q);
+      return w.A * Math.pow(q, 1.4) * Math.min(1.4, g);
+    },
+
+    // A second crest travelling in from the jetty side (left) that merges into the peak
+    // around q≈0.5 — the moment the reflected wave stacks onto the incoming swell. Returns
+    // an additive height bump (as a fraction of the base envelope) centred on its position.
+    stackSurge(x, q) {
+      const w = this.wv;
+      if (q < 0.12 || q > 0.72) return 0;
+      const k = (q - 0.12) / 0.6;                 // 0→1 as it sweeps in and locks up
+      const from = this.peakX() - 150;            // starts well off the jetty side
+      const cx = from + (this.peakX() - from) * Math.min(1, k * 1.15);
+      const amp = 0.72 * Math.sin(Math.min(1, k) * Math.PI);  // swells then is absorbed
+      return amp * Math.exp(-(((x - cx) / (w.sigma * 0.55)) ** 2));
     },
 
     // ---------------- update
@@ -355,6 +405,7 @@ export function makeScenes(game) {
       if (this.mode === 'replay') { this.updateReplay(dt); return; }
       const m = this.mode;
       if (m === 'watch') this.updateWatch(dt);
+      else if (m === 'npc') this.updateNpc(dt);
       else if (m === 'ride') this.updateRide(dt);
       else if (m === 'exit') this.updateExit(dt);
       else this.updatePitch(dt);
@@ -374,11 +425,11 @@ export function makeScenes(game) {
       if (!game.daily && !this.committed && this.q() > 0.5 && game.wave <= 2) {
         if (w.makeable && !w.monster && !game.taughtMakeable) {
           game.taughtMakeable = true;
-          this.say('WATCH THE SPRAY', 'FEATHERS AT THE PEAK = RIDEABLE', 1.8);
+          this.say('IT\'S A LEFT', 'RIDEABLE — GO FOR IT', 1.8);
           this.holdT = 1.5;
         } else if (!w.makeable && !game.taughtCloseout) {
           game.taughtCloseout = true;
-          this.say('FEATHERS EVERYWHERE = WALL', 'LET IT GO', 1.8);
+          this.say('DUDE THAT\'S GONNA CLOSE OUT', 'DON\'T GET SMASHED', 1.8);
           this.holdT = 1.5;
         }
       }
@@ -425,7 +476,7 @@ export function makeScenes(game) {
       if (!this.committed) {
         // letting waves go never touches the streak (GOOD CALL / WAVE WASTED)
         if (w.monster) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
-        else if (w.makeable) { this.say('WAVE WASTED', 'THAT ONE WAS A RUNNER'); this.recordAndAdvance('waste'); }
+        else if (w.makeable) { this.say('WAVE WASTED', 'DUDE, THAT WAS THE ONE'); this.recordAndAdvance('waste'); }
         else { game.score += 150; this.say('GOOD CALL', 'CLOSEOUT — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
       } else if (w.monster) {
         // committing to a bomb — the clip moment. Record the drop+ride so we can offer an
@@ -483,6 +534,46 @@ export function makeScenes(game) {
         if (game.wave >= 10) { game.goto('dailyresult', { dateKey: dailyKey(), dayNum: dailyNum() }); return; }
       }
       this.newWave();
+    },
+
+    // ---- NPC beat: a lineup rider takes a quick interstitial wave while you watch.
+    //      Two flavors, same lesson as your own reads: a walled one pitches + smashes
+    //      them; a clearly-smaller one runs clean down the line. ~4s focus beat, then
+    //      your wave builds as normal (its clock was held at 0 the whole time).
+    npcPhase() { return { STAND: 1.2, DROP: 1.9, TOSS: 2.8, END: 4.0 }; },
+    startNpc() {
+      this.mode = 'npc';
+      this.nT = 0;
+      this.nMake = Math.random() < 0.5;                     // small runner vs walled smash
+      this.nPeak = 70 + Math.random() * 100;
+      this.nA = this.nMake ? 46 + Math.random() * 10 : 88 + Math.random() * 18;
+      this.nTakeX = this.nPeak + (this.nMake ? 18 : 6);     // runner starts on the shoulder
+      this.nSpin = Math.random() < 0.5 ? -1 : 1;
+      this.nDone = false;                                   // outcome shown yet?
+      this.shake = 0;
+      // hide the nearest lineup rider — that's who's going
+      let best = 0, bd = 1e9;
+      this.riders.forEach((r, i) => { const d = Math.abs(r.x - this.nTakeX); if (d < bd) { bd = d; best = i; } });
+      this.nHide = best;
+      this.say(this.nMake ? 'GOING ON A SMALL ONE...' : 'GOING ON A WALLED ONE...', null, 1.5);
+      audio.tone(58, 0.8, { type: 'triangle', vol: 0.07, slide: 20 });
+    },
+    updateNpc(dt) {
+      this.nT += dt;
+      const ph = this.npcPhase();
+      if (!this.nDone && this.nT >= ph.TOSS) {
+        this.nDone = true;
+        if (this.nMake) {
+          audio.select();
+          this.say('MADE IT!', 'THE SMALL ONES RUN', 1.7);
+        } else {
+          this.shake = 4;
+          audio.crash(); audio.noise(0.6, { vol: 0.12 });
+          this.say('PITCHED AND SMASHED!', 'WALLS HAVE NO EXIT', 1.7);
+        }
+      }
+      if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
+      if (this.nT >= ph.END) this.mode = 'watch';           // your wave builds as normal
     },
 
     startRide(late, tier) {
@@ -558,21 +649,29 @@ export function makeScenes(game) {
       const w = this.wv;
       const ph = this.pitchPhase();
       const crestY = SURFACE - w.A;
-      // the towering wall, peaking where the lip throws
+      // the towering wall, peaking where the lip throws — same asymmetric top-heavy wedge:
+      // steep on the jetty side, longer on the shoulder, and it JACKS up over its own base
+      // (overhang) rather than standing like a round swell.
       for (let x = 0; x < W; x += 2) {
-        const g = Math.exp(-(((x - this.lipX) / 74) ** 2));
+        const dx = x - this.lipX;
+        const sig = dx < 0 ? 50 : 82;
+        const g = Math.exp(-Math.pow(Math.abs(dx) / sig, 1.4));
         const h = w.A * g * 1.02;
         if (h < 2) continue;
+        // upper face leans forward toward the shoulder as it stands — the pitching overhang
+        const lean = Math.round((h / w.A) * 10 * Math.max(0, 1 - this.pT / (ph.DROP + 0.4)));
         const top = SURFACE - h;
-        ctx.fillStyle = p.seaD; ctx.fillRect(x, Math.round(top), 2, H - Math.round(top));
-        ctx.fillStyle = p.sea;  ctx.fillRect(x, Math.round(top + h * 0.4), 2, Math.round(h * 0.6));
+        ctx.fillStyle = p.seaD; ctx.fillRect(x + lean, Math.round(top), 2, H - Math.round(top));
+        ctx.fillStyle = p.sea;  ctx.fillRect(x + lean, Math.round(top + h * 0.4), 2, Math.round(h * 0.6));
         // crest feathers menacingly while it stands and he drops in
         if (this.pT < ph.DROP && Math.abs(x - this.lipX) < 42 && (x + Math.floor(this.animT * 10)) % 4 < 2) {
-          ctx.fillStyle = p.foam; ctx.fillRect(x, Math.round(top) - 2, 2, 4);
+          ctx.fillStyle = p.foam; ctx.fillRect(x + lean, Math.round(top) - 2, 2, 4);
         }
       }
-      // the lip pitches over once the drop fails — churning curtain, grows through the toss
-      const fall = Math.max(0, Math.min(1, (this.pT - ph.DROP) / 1.2));
+      // the lip pitches over once the drop fails — churning curtain, grows through the toss,
+      // then collapses into whitewater once the wave lands (so it doesn't linger as a ghost).
+      const collapse = this.pSmashed ? Math.max(0, 1 - (this.pT - ph.TOSS) / 0.4) : 1;
+      const fall = Math.max(0, Math.min(1, (this.pT - ph.DROP) / 1.2)) * collapse;
       if (fall > 0) {
         for (let x = Math.round(this.lipX - 46); x < this.lipX + 52; x += 2) {
           if (x < 0 || x >= W) continue;
@@ -639,8 +738,31 @@ export function makeScenes(game) {
         ctx.restore();
       }
 
-      // the wave lands: bury him in churning whitewater
+      // the wave lands: it detonates in shallow water, throwing an exploding wall of
+      // whitewater up off the sand — then buries him in the churn.
       if (this.pSmashed) {
+        // low explosion across the impact zone — the thump into ankle-deep water throws a
+        // ragged wall of foam UP off the sand, churning (not a clean block).
+        const blast = Math.min(1, (this.pT - ph.TOSS) / 0.5);
+        for (let x = Math.round(this.lipX - 70); x < this.lipX + 80; x += 3) {
+          if (x < 0 || x >= W) continue;
+          const d = Math.abs(x - this.lipX) / 78;
+          const jag = 0.6 + 0.4 * Math.abs(Math.sin(x * 0.6 + this.pT * 9)) + ((x * 13) % 4) * 0.06;
+          const up = Math.round(blast * (44 - d * 30) * jag);
+          if (up < 2) continue;
+          ctx.fillStyle = p.foam;
+          ctx.fillRect(x, SURFACE - up, 3, up);                       // ragged spikes above the line
+          ctx.fillStyle = 'rgba(255,255,255,0.55)';                    // churn just below the line
+          ctx.fillRect(x, SURFACE, 3, Math.round(6 + jag * 8));
+        }
+        // spray flung skyward off the detonation
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (let i = 0; i < 22; i++) {
+          const a = i * 0.9;
+          const rr = blast * 40 + (i % 4) * 6;
+          ctx.fillRect(Math.round(this.lipX + Math.cos(a) * rr * 1.4),
+                       Math.round(SURFACE - 20 - Math.abs(Math.sin(a)) * rr), 2, 3);
+        }
         ctx.fillStyle = p.foam;
         for (let i = 0; i < 54; i++) {
           const fx = rx - 32 + ((i * 37) % 64);
@@ -889,7 +1011,7 @@ export function makeScenes(game) {
       const p = pal();
       // screen shake when the wave lands on a pitched wipeout — jitter the world layer,
       // overscan the backdrop so no black edge shows, keep the HUD steady
-      const shk = (this.mode === 'pitch' && this.shake > 0) ? this.shake : 0;
+      const shk = ((this.mode === 'pitch' || this.mode === 'npc') && this.shake > 0) ? this.shake : 0;
       if (shk) { ctx.save(); ctx.translate(Math.round((Math.random() * 2 - 1) * shk), Math.round((Math.random() * 2 - 1) * shk)); }
       const bgKey = BG_KEYS[game.stage];
       if (imgReady(bgKey)) {
@@ -899,6 +1021,7 @@ export function makeScenes(game) {
         skyAndSea(ctx, p);
       }
       if (this.mode === 'watch') this.drawWatch(ctx, p);
+      else if (this.mode === 'npc') this.drawNpc(ctx, p);
       else if (this.mode === 'ride') this.drawRide(ctx, p);
       else if (this.mode === 'exit') this.drawExit(ctx, p);
       else this.drawPitch(ctx, p);
@@ -931,16 +1054,31 @@ export function makeScenes(game) {
         ctx.fillRect(0, 112 + i * 4, W, 1);
         ctx.fillRect(Math.round(sx), 111 + i * 4, 30, 2);
       }
+      // the reflected wedge: a diagonal crest peeling off the jetty side, converging on
+      // the peak. This is the second wave that stacks onto the swell (see stackSurge).
+      if (q > 0.12 && q < 0.72) {
+        const k = (q - 0.12) / 0.6;
+        const from = peak - 150;
+        const cx = from + (peak - from) * Math.min(1, k * 1.15);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        for (let i = 0; i < 26; i++) {
+          const lx = cx - i * 5;                    // trailing diagonal back toward the jetty
+          if (lx < -6) break;
+          ctx.fillRect(Math.round(lx), Math.round(120 + i * 1.4), 4, 2);
+        }
+      }
+      // looser, gradient-shaded face: dark pocket under the lip rolling to a glassy lit base
+      const fg = faceGradient(ctx, baseY - this.waveH(peak, q), SURFACE, p);
       for (let x = 0; x < W; x += 2) {
         const h = this.waveH(x, q);
         if (h < 2) continue;
         const top = baseY - h;
-        ctx.fillStyle = p.seaD;
+        ctx.fillStyle = fg;
         ctx.fillRect(x, Math.round(top), 2, Math.round(h));
-        // open face catches light on the shoulder (right of peak)
+        // open face catches more light on the shoulder (right of peak) — soft glassy sheen
         if (x > peak) {
-          ctx.fillStyle = p.sea;
-          ctx.fillRect(x, Math.round(top + h * 0.35), 2, Math.round(h * 0.65));
+          ctx.fillStyle = 'rgba(180,224,248,0.16)';
+          ctx.fillRect(x, Math.round(top + h * 0.45), 2, Math.round(h * 0.55));
         }
         // surface texture flowing rightward with the wave — this sells the travel
         if (h > 10) {
@@ -961,6 +1099,45 @@ export function makeScenes(game) {
         if (q > 0.82 && Math.abs(x - peak) < 16) {
           ctx.fillStyle = p.foam;
           ctx.fillRect(x, Math.round(top) - 1, 2, 6);
+        }
+      }
+      // pitching lip: once it stands up the top-heavy crest throws FORWARD over the
+      // trough toward the shoulder, casting a shadow band beneath — the tube forming.
+      if (q > 0.6) {
+        const jut = (q - 0.6) / 0.4;                       // 0→1 as it pitches over
+        const ctop = baseY - this.waveH(peak, q);
+        const reach = Math.round(7 + jut * 18);            // how far it overhangs the shoulder
+        ctx.fillStyle = 'rgba(8,16,48,0.30)';              // cavity shadow under the overhang
+        ctx.fillRect(peak, Math.round(ctop + 1), reach + 6, Math.round(12 + jut * 16));
+        ctx.fillStyle = p.foam;
+        for (let i = 0; i <= reach; i += 2) {              // the curling lip, drooping as it reaches
+          const t = i / reach;
+          const ly = ctop - 4 + Math.round(t * t * (7 + jut * 12));
+          ctx.fillRect(peak + i, Math.round(ly), 3, Math.round(5 + jut * 4));
+        }
+      }
+      // backwash (stage 2+): water rebounding off the steep beach rushes back out and
+      // collides with the wave's base near the peak — the Wedge's signature chop. A band
+      // of churn sweeps seaward along the base; where it meets the face it throws spray.
+      if (game.stage >= 2 && q > 0.35) {
+        const cyc = (this.animT * 0.9) % 1;
+        const cx = peak + 40 - cyc * 52;                   // sweeping in toward the peak base
+        // chop rides on the wave's own base line, not on flat open water
+        const baseAt = (xx) => baseY - Math.min(this.waveH(xx, q), 10) - 1;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        for (let i = 0; i < 5; i++) {
+          const bx = Math.round(cx + i * 4);
+          if (bx < peak - 4 || bx > peak + 44) continue;   // only the shoreward base near the peak
+          ctx.fillRect(bx, Math.round(baseAt(bx) + (i % 2) * 2), 3, 2);
+        }
+        if (cyc > 0.72) {                                  // collision: spray kicks up the face
+          const burst = (cyc - 0.72) / 0.28;
+          const fy = baseAt(peak + 4);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          for (let i = 0; i < 6; i++) {
+            const sx = peak - 4 + (i % 3) * 5;
+            ctx.fillRect(sx, Math.round(fy - burst * (10 + i * 4)), 3, 3);
+          }
         }
       }
       // takeoff marker: appears on makeable waves once the wave shows its hand
@@ -1020,17 +1197,133 @@ export function makeScenes(game) {
       const goHint = this.committed
         ? 'COMMITTED — HERE IT COMES!'
         : (input.usedTouch ? 'SLIDE ←→ TO MOVE · TAP WHEN ▼ IS OVER YOU' : '←→ UNDER THE MARKER · X WHEN IT\'S OVER YOU');
-      text(ctx, w.makeable || q < 0.5 ? goHint : 'FEATHERING EVERYWHERE = CLOSEOUT. DON\'T GO', W / 2, 224, 7, q > 0.5 && !w.makeable ? '#f85838' : '#fff', 'center');
+      text(ctx, w.makeable || q < 0.5 ? goHint : 'THAT ONE WAS WALLED OUT. DON\'T GO', W / 2, 224, 7, q > 0.5 && !w.makeable ? '#f85838' : '#fff', 'center');
       text(ctx, 'SET', 6, 22, 7, '#fff');
       ctx.fillStyle = '#181828'; ctx.fillRect(30, 23, 60, 5);
       ctx.fillStyle = q > 0.8 ? '#f85838' : '#f8d848';
       ctx.fillRect(30, 23, Math.round(q * 60), 5);
     },
 
+    // the interstitial NPC wave — same visual language as drawWatch (march-in, gradient
+    // face, the feathering tell) so the lesson transfers, minus markers/meters: you're
+    // a spectator for ~4s.
+    drawNpc(ctx, p) {
+      const ph = this.npcPhase();
+      const q = Math.min(1, this.nT / ph.STAND);
+      const A = this.nA, peak = this.nPeak;
+      const baseY = 116 + q * (SURFACE - 116);
+      const hAt = (x) => {
+        const dx = x - peak;
+        const sig = dx < 0 ? 44 : (this.nMake ? 72 : 58);
+        let g = Math.exp(-Math.pow(Math.abs(dx) / sig, 1.4));
+        if (!this.nMake) g = Math.min(1, g * 1.7);          // squared-off wall
+        return A * Math.pow(q, 1.4) * g;
+      };
+      const crestY = baseY - hAt(peak);
+      const fg = faceGradient(ctx, crestY, SURFACE, p);
+      for (let x = 0; x < W; x += 2) {
+        const h = hAt(x);
+        if (h < 2) continue;
+        const top = baseY - h;
+        ctx.fillStyle = fg;
+        ctx.fillRect(x, Math.round(top), 2, Math.round(h));
+        if (x > peak) {
+          ctx.fillStyle = 'rgba(180,224,248,0.16)';
+          ctx.fillRect(x, Math.round(top + h * 0.45), 2, Math.round(h * 0.55));
+        }
+        // the exact tell you read on your own waves — reinforced from the channel
+        const feather = this.nMake ? Math.abs(x - peak) < 22 : h > A * q * 0.55;
+        if (q > 0.5 && feather && (x + (Math.floor(this.animT * 10) % 4)) % 4 < 2) {
+          ctx.fillStyle = p.foam;
+          ctx.fillRect(x, Math.round(top) - 2, 2, 4);
+        }
+      }
+      // walled flavor: the lip throws once the drop fails, then collapses at impact
+      if (!this.nMake && this.nT > ph.DROP) {
+        const collapse = this.nDone ? Math.max(0, 1 - (this.nT - ph.TOSS) / 0.4) : 1;
+        const fall = Math.min(1, (this.nT - ph.DROP) / 0.9) * collapse;
+        for (let x = Math.round(peak - 34); x < peak + 38; x += 2) {
+          if (x < 0 || x >= W) continue;
+          const col = (x - peak) / 38;
+          const jag = 1 + Math.sin(x * 0.5 + this.nT * 12) * 0.12;
+          const len = Math.max(2, (A * 0.8) * fall * (1 - Math.abs(col) * 0.42) * jag);
+          ctx.fillStyle = 'rgba(232,240,248,0.72)';
+          ctx.fillRect(x, Math.round(crestY), 2, Math.round(len));
+          ctx.fillStyle = p.foam;
+          ctx.fillRect(x, Math.round(crestY + len - 4), 2, 4);
+        }
+      }
+      // the smash: ragged foam thrown up off the sand where the wave lands
+      if (!this.nMake && this.nDone) {
+        const blast = Math.min(1, (this.nT - ph.TOSS) / 0.5);
+        ctx.fillStyle = p.foam;
+        for (let x = Math.round(peak - 44); x < peak + 50; x += 3) {
+          if (x < 0 || x >= W) continue;
+          const d = Math.abs(x - peak) / 48;
+          const jag = 0.6 + 0.4 * Math.abs(Math.sin(x * 0.6 + this.nT * 9));
+          const up = Math.round(blast * (30 - d * 20) * jag);
+          if (up >= 2) ctx.fillRect(x, baseY - up, 3, up + 5);
+        }
+      }
+      // ---- the NPC rider, per phase (always the boarder sprites — a local) ----
+      let rx, ry, rot = 0, key = 'sp_b_paddle';
+      if (this.nT < ph.STAND) {
+        rx = this.nTakeX;                                    // paddling in as it stands up
+        ry = baseY - hAt(rx) + 4;
+      } else if (this.nT < ph.DROP) {
+        const dp = (this.nT - ph.STAND) / (ph.DROP - ph.STAND);
+        rx = this.nTakeX + dp * 8;                           // dropping down the face
+        ry = (baseY - hAt(this.nTakeX)) + 6 + dp * dp * hAt(this.nTakeX) * 0.45;
+        rot = 0.2 + dp * 0.3;
+        key = 'sp_b_drop';
+      } else if (this.nMake) {
+        // racing the shoulder, outrunning the peel, spray off the tail
+        const tp = Math.min(1, (this.nT - ph.DROP) / (ph.END - 0.4 - ph.DROP));
+        rx = this.nTakeX + 8 + tp * 52;
+        ry = SURFACE - hAt(rx) * 0.35 - 4;
+        rot = -0.08;
+        key = 'sp_b_ride';
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        for (let i = 0; i < 5; i++) ctx.fillRect(Math.round(rx - 8 - i * 5), Math.round(ry + 6 + (i % 2) * 2), 3, 2);
+      } else if (!this.nDone) {
+        // pitched — thrown up and over with the lip
+        const tp = (this.nT - ph.DROP) / (ph.TOSS - ph.DROP);
+        rx = this.nTakeX + 8 + tp * 18;
+        ry = (SURFACE - A * 0.5) - Math.sin(tp * Math.PI * 0.8) * 26 + tp * 40;
+        rot = this.nSpin * (0.4 + tp * 3.4);
+        key = 'sp_b_ride';
+      } else {
+        rx = this.nTakeX + 26; ry = SURFACE - 12;            // buried in the churn
+        rot = this.nSpin * 1.8;
+        key = 'sp_b_ride';
+      }
+      if (!drawRiderImg(ctx, key, rx, ry, rot, 0, 1)) {
+        ctx.save();
+        ctx.translate(rx, ry); ctx.rotate(rot);
+        drawMap(ctx, MAPS.paddleA, -16, -6, 2, true);
+        ctx.restore();
+      }
+      // the rest of the lineup (minus whoever went) + you, sitting, lifted by the swell
+      for (let i = 0; i < this.riders.length; i++) {
+        if (i === this.nHide) continue;
+        const r = this.riders[i];
+        const ry2 = LINEUP_Y + Math.sin(this.animT * 2 + r.ph) * 2 - hAt(r.x) * 0.25 * q * q;
+        if (!drawRiderImg(ctx, 'sp_b_sit', r.x, ry2 - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, r.x - 16, ry2 - 6, 2, true);
+      }
+      const py = LINEUP_Y + Math.sin(this.animT * 2.6) * 2 - hAt(this.px) * 0.25 * q * q;
+      if (!drawRiderImg(ctx, riderKey('sit'), this.px, py - 4, 0, 0)) {
+        drawMap(ctx, spr().paddleA, this.px - 16, py - 6, 2, true);
+      }
+      ctx.fillStyle = '#f8f890';
+      ctx.fillRect(this.px - 1, py + 10, 3, 2);              // you-marker stays put
+    },
+
     drawRide(ctx, p) {
       const foamX = this.foamX;
       const pkX = this.pocketX();
       const w = this.wv;
+      // looser, gradient-shaded standing face: dark in the pocket, glassy toward the base
+      const fg = faceGradient(ctx, SURFACE - w.A, SURFACE, p);
       // full standing wave: broken behind the foam edge, open face ahead of it
       for (let x = 0; x < W; x += 2) {
         const taper = x > foamX ? Math.max(0.55, 1 - ((x - foamX) / W) * 0.9) : 1;
@@ -1042,10 +1335,11 @@ export function makeScenes(game) {
           const jy = Math.round(top + Math.sin(x * 0.3 + this.animT * 14) * 4);
           ctx.fillRect(x, jy, 2, H - jy);
         } else {
-          ctx.fillStyle = p.seaD;
+          ctx.fillStyle = fg;
           ctx.fillRect(x, Math.round(top), 2, H - Math.round(top));
-          ctx.fillStyle = p.sea;
-          const my = Math.round(top + h * 0.5);
+          // glassy sheen low on the open face
+          ctx.fillStyle = 'rgba(180,224,248,0.12)';
+          const my = Math.round(top + h * 0.55);
           ctx.fillRect(x, my, 2, H - my);
         }
       }
@@ -1070,22 +1364,48 @@ export function makeScenes(game) {
       grad.addColorStop(1, 'rgba(255,250,200,0.35)');
       ctx.fillStyle = grad;
       ctx.fillRect(pkX + 40, SURFACE - w.A, W - pkX - 40, H - (SURFACE - w.A));
-      // the tube: cavity + lip curling overhead from the foam edge past the rider
-      const tubeR = pkX + 34;
-      ctx.fillStyle = 'rgba(8,16,48,0.42)';
-      ctx.fillRect(Math.round(foamX - 6), Math.round(SURFACE - w.A + 8), Math.round(tubeR - foamX + 6), Math.round(w.A + 14));
-      ctx.fillStyle = p.foam;
-      for (let x = Math.round(foamX - 6); x < tubeR; x += 2) {
-        const frac = (x - foamX + 6) / (tubeR - foamX + 6);
-        const thick = Math.round(14 - frac * 10);
-        const lipY = SURFACE - w.A - 4 + Math.round(frac * frac * 10);
-        ctx.fillRect(x, lipY, 2, thick);
+      // the barrel: a hollow, ROUNDED tube. The top-heavy lip throws over from the crest,
+      // curls down toward the shoulder to roof the cavity, and the mouth opens down the
+      // line where the light gets in — that's the exit the rider is driving for.
+      const tubeL = Math.round(foamX - 14);
+      const tubeR = pkX + 54;                       // wider mouth = a bigger, rounder barrel
+      const crestY = SURFACE - w.A;
+      const span = tubeR - tubeL;
+      // ceiling of the barrel: the lip pitches WAY out from the crest and arcs down low
+      // over the rider, roofing a deep cavity — the more it curls, the more hollow it reads.
+      const lipCurve = (x) => {
+        const f = Math.max(0, Math.min(1, (x - tubeL) / span));
+        return crestY - 8 + f * f * (w.A * 0.5);    // drops toward mid-face — a real overhang
+      };
+      // deep dark hollow under the overhang — nearly the full face at the throwing pit
+      for (let x = tubeL; x < tubeR; x += 2) {
+        const f = (x - tubeL) / span;
+        const cy = lipCurve(x);
+        const depth = Math.round(w.A * (0.5 + 0.34 * Math.sin(f * Math.PI)));
+        ctx.fillStyle = 'rgba(4,10,34,0.62)';
+        ctx.fillRect(x, Math.round(cy), 2, depth);
       }
-      // falling curtain drips at the tube mouth
-      for (let i = 0; i < 4; i++) {
-        const dx = tubeR - 4 + i * 3;
+      // bright spot down the line — the light at the end of the tube, framed by the cavity
+      const exitY = crestY + Math.round(w.A * 0.5);
+      const eg = ctx.createRadialGradient(tubeR + 8, exitY, 2, tubeR + 8, exitY, 34);
+      eg.addColorStop(0, 'rgba(255,250,210,0.6)');
+      eg.addColorStop(1, 'rgba(255,250,210,0)');
+      ctx.fillStyle = eg;
+      ctx.fillRect(tubeR - 24, crestY, 60, Math.round(w.A * 0.9));
+      // the throwing lip itself — thick pitching curtain at the crest, tapering to the mouth
+      for (let x = tubeL; x < tubeR; x += 2) {
+        const f = (x - tubeL) / span;
+        const cy = lipCurve(x);
+        const thick = Math.round(20 - f * 13);
+        ctx.fillStyle = p.foam;
+        ctx.fillRect(x, Math.round(cy - thick), 2, thick);
+      }
+      // falling curtain drips off the pitching lip at the tube mouth
+      ctx.fillStyle = p.foam;
+      for (let i = 0; i < 5; i++) {
+        const dx = tubeR - 6 + i * 3;
         const len = 10 + Math.round(Math.sin(this.animT * 10 + i * 2) * 6) + i * 4;
-        ctx.fillRect(dx, SURFACE - w.A + 6, 2, len);
+        ctx.fillRect(dx, Math.round(lipCurve(dx)), 2, len);
       }
       // pocket band — where you need to be (width is per-rider, Phase 3)
       const pyT = this.pocketY();
@@ -1224,10 +1544,8 @@ export function makeScenes(game) {
         ctx.restore();
       }
       // banner
-      if (this.trickDone) {
-        text(ctx, game.rider === 'boarder' ? 'RE-ENTRY — STOMPED IT!' : 'BARREL ROLL — STOMPED IT!', W / 2, 40, 8, '#f8f890', 'center');
-      } else if (this.exT > 0.9) {
-        text(ctx, game.rider === 'boarder' ? 'OFF THE LIP!' : 'ROLL!', W / 2, 40, 9, '#f8f890', 'center');
+      if (this.trickDone || this.exT > 0.9) {
+        text(ctx, 'CHEE HOO!', W / 2, 40, 9, '#f8f890', 'center');
       }
     },
   };

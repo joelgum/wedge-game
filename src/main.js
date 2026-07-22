@@ -2,7 +2,7 @@
 // ?v= querystrings bust stale module caches on phones; bump together in all files
 import { input, MUTE_RECT } from './input.js?v=4';
 import { audio } from './audio.js?v=4';
-import { makeScenes } from './scenes.js?v=20';
+import { makeScenes } from './scenes.js?v=21';
 
 const W = 256, H = 240;
 
