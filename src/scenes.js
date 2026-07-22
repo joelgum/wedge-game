@@ -1197,7 +1197,7 @@ export function makeScenes(game) {
       const goHint = this.committed
         ? 'COMMITTED — HERE IT COMES!'
         : (input.usedTouch ? 'SLIDE ←→ TO MOVE · TAP WHEN ▼ IS OVER YOU' : '←→ UNDER THE MARKER · X WHEN IT\'S OVER YOU');
-      text(ctx, w.makeable || q < 0.5 ? goHint : 'THAT ONE WAS WALLED OUT. DON\'T GO', W / 2, 224, 7, q > 0.5 && !w.makeable ? '#f85838' : '#fff', 'center');
+      text(ctx, w.makeable || q < 0.5 ? goHint : 'CLOSED OUT — NOWHERE TO GO', W / 2, 224, 7, q > 0.5 && !w.makeable ? '#f85838' : '#fff', 'center');
       text(ctx, 'SET', 6, 22, 7, '#fff');
       ctx.fillStyle = '#181828'; ctx.fillRect(30, 23, 60, 5);
       ctx.fillStyle = q > 0.8 ? '#f85838' : '#f8d848';
