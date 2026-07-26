@@ -43,7 +43,20 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 
 ### Ride — the drop + the tube
 - A long, heavy **drop** down the face — deliberate hang-time so it reads as a big, heavy wave — then **hold the line**: keep the rider in the pocket band with ↑↓ (or vertical drag) as the wave tries to bury you.
+- The pocket band is **the wave surging under you**: a smooth, non-repeating wander (three sines with no common period + per-ride random phases), drawn the whole way down the line with look-ahead so it's readable, never a gotcha.
+- The wave **breaks behind the rider and eats forward** (it peels left→right; the rider trims right, so the break is behind him): clean blue face ahead of the break, a boiling churn where it's turning over right now, white tumbling whitewater behind. Cosmetic pressure only — it never overtakes you.
 - The foam curtain chases from behind on the **left**; sometimes it swallows the rider and he comes back out through the tube. A late drop adds a ~1.2s decaying chaos window. Fall out of the pocket too long = BURIED (wipeout).
+
+### Tricks — one button, the band picks the move (Phase 5, 2026-07-26)
+Where you sit in the pocket band when you press X / tap decides the trick. Same three zones for both riders, so the input never changes — only the move does.
+
+| Band zone | Bodyboarder | Bodysurfer | Notes |
+|---|---|---|---|
+| High (by the lip) | AIR — launch, one rotation, land back in the band | EL ROLLO | Landing outside the band = no score, chain reset, BURIED clock starts. The channel wanders while you're airborne — that's the risk. |
+| Middle | 360 SPIN on the face | BODY ROTATION | ~0.6s, no steering, drift keeps running. |
+| Low (trough), **held** | KNEE DROP + hand drag | LAY-BACK, arm spread | Scores per second while held and in the band; steering drops to half. |
+
+**Tricks lead the scoring.** Passive in-pocket points were cut (60/s → 22/s); linking tricks without losing the pocket builds a **chain multiplier** (1 + 0.35 per link, capped 2.4×) that stacks on the wave streak. Buried > 0.35 or a blown air landing resets the chain. Kick-out bonus now counts the tricks landed.
 - Hold the pocket to the end and you get blasted out ahead of the spit — **the wall shuts down behind you: MADE IT** (kick-out bonus), then the next wave rolls in.
 
 ### Scoring
@@ -204,7 +217,7 @@ retro NES game HUD elements: pixel heart life icons x3, score counter in blocky 
 | 3 | **Ride + wipeout** | ✅ Heavy cubic-hang drop, hold-the-pocket tube, buried/closeout wipeouts, made-wave exit cinematic; full 3-life session playable |
 | 4 | **Rider select** | ✅ Bodyboarder / bodysurfer, wired through every player draw (placeholder sprites) |
 | 5 | **Mobile controls** | ✅ Relative-slide steering (finger-as-controller) + tap-to-go; no-cache dev server for iOS |
-| 6 | **Art pass** | ⬜ Run §5 Midjourney prompts, hand-pixel to the 16-color grid, replace placeholder sprites; day-progression palettes already swap in code |
+| 6 | **Art pass** | 🟡 Backdrops + rider frames are in (Gemini). **Outstanding: the 4 trick poses** — prompts ready in [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) (`spr_b_spin`, `spr_b_air`, `spr_b_knee`, `spr_s_layback`); tricks play on transformed stand-ins until they land, and each slots in by uncommenting one `loadImg` line |
 | 7 | **Audio pass** | 🟡 8-bit SFX + chiptune synth working in code; could refine/mix |
 | 8 | **Polish + ship** | 🟡 High scores, pause, mute persist and touch is usable; **remaining:** deploy to a live URL (Astro route or standalone Vercel) |
 

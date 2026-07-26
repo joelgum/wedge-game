@@ -59,12 +59,33 @@ const RIDER_ART = {
   boarder: { sit: 'sp_b_sit', paddle: 'sp_b_paddle', drop: 'sp_b_drop', ride: 'sp_b_ride' },
   surfer: { sit: 'sp_s_tread', paddle: 'sp_s_prone', drop: 'sp_s_drop', ride: 'sp_s_prone' },
 };
+// Trick art (Phase 5). The moves already play using the frames above, transformed in
+// code; these are the dedicated poses. Generate them with the prompts in
+// SPRITE_PROMPTS.md, drop the PNG in assets/, uncomment its line — nothing else to do,
+// drawRide picks a trick frame up automatically the moment it loads (see trickArt).
+// loadImg('sp_b_spin', 'spr_b_spin.png');     // boarder — flat 360 on the face
+// loadImg('sp_b_air', 'spr_b_air.png');       // boarder — airborne, rail grab
+// loadImg('sp_b_knee', 'spr_b_knee.png');     // boarder — knee drop + hand drag
+// loadImg('sp_s_layback', 'spr_s_layback.png'); // bodysurfer — lay-back, arm spread
+const TRICK_ART = {
+  boarder: { spin: 'sp_b_spin', air: 'sp_b_air', stance: 'sp_b_knee' },
+  surfer: { spin: 'sp_s_spin', air: 'sp_s_spin', stance: 'sp_s_layback' },
+};
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
 // band/tube/exit are multipliers on the base pocket width, tube scoring, and exit bonus.
 const RIDER_STATS = {
   boarder: { band: 1.25, tube: 1.0, exit: 1.0 },
   surfer: { band: 0.85, tube: 1.4, exit: 1.25 },
+};
+// Phase 5 tricks: ONE button, and where you sit in the pocket band picks the move.
+//   top of the band (up by the lip) → AIR    · launch, rotate, land back in the band
+//   middle of the band             → SPIN   · 360 on the face / bodysurf body rotation
+//   bottom of the band (trough)    → STANCE · HOLD it: knee-drop hand-drag / lay-back
+// Same three zones for both riders so the input never changes; only the move does.
+const TRICKS = {
+  boarder: { air: 'AIR!', spin: '360 SPIN!', stance: 'KNEE DROP' },
+  surfer: { air: 'EL ROLLO!', spin: 'BODY ROTATION!', stance: 'LAY-BACK' },
 };
 
 // Draw a rider-art frame centered at (cx, cy) with optional rotation, crisp (no smoothing).
@@ -141,6 +162,11 @@ export function makeScenes(game) {
   };
   const spr = () => SPR[game.rider] || SPR.boarder;
   const riderKey = (pose) => (RIDER_ART[game.rider] || RIDER_ART.boarder)[pose];
+  // dedicated trick frame if its art has loaded, otherwise the transformed stand-in
+  const trickArt = (kind, fallback) => {
+    const k = (TRICK_ART[game.rider] || TRICK_ART.boarder)[kind];
+    return imgReady(k) ? k : fallback;
+  };
   const stat = () => RIDER_STATS[game.rider] || RIDER_STATS.boarder;
 
   // score multiplier from the current streak: 1 → 1.5 → 2 … capped at 4×
@@ -598,12 +624,20 @@ export function makeScenes(game) {
       audio.tone(900, 1.1, { type: 'sawtooth', slide: -760, vol: 0.09, delay: 1.0 });
       audio.noise(0.4, { vol: 0.06, delay: 1.3 });
       this.pocketPh = Math.random() * 6;
+      // per-ride phases for the wandering pocket band (see bandCenterAt) — the channel
+      // is different every wave, so it can't be memorised
+      this.bandSeed = { a: Math.random() * 6.28, b: Math.random() * 6.28, c: Math.random() * 6.28 };
       this.buried = 0;
       this.tubeTime = 0;
       this.rideLen = 3.0 + Math.random() * 1.6;
       this.band = 15 * stat().band;   // per-rider pocket width (Phase 3)
-      this.spinT = 0;                 // remaining spin-trick time
-      this.spinCd = 0;                // spin cooldown — max one per second
+      // trick state (Phase 5) — flat fields so the instant-replay recorder can snapshot them
+      this.trickKind = null;          // null | 'air' | 'spin' | 'stance'
+      this.trickT = 0; this.trickDur = 0; this.trickCd = 0;
+      this.airFrom = 0; this.airH = 42 + game.stage * 4;
+      this.stanceScore = 0; this.holdTouchT = 0;
+      this.chain = 0;                 // tricks linked without losing the pocket
+      this.trickCount = 0;
       this.bombRide = false;          // set true by rideBomb() — doubles the exit bonus
     },
 
@@ -774,9 +808,97 @@ export function makeScenes(game) {
     },
 
     pocketX() { return Math.min(226, this.foamX + 18); },
-    pocketY() {
+    // The pocket isn't a metronome — it's the wave surging under you. Three sines whose
+    // frequencies share no common period (0.61 / 1.07 / 1.73) plus per-ride random phases
+    // give a channel that wanders organically and never repeats, but stays smooth enough
+    // to read and track: every bury is still your fault.
+    bandCenterAt(tt) {
       const amp = this.pAmp + this.lateAmp * Math.max(0, 1 - this.rt / 1.2);
-      return 134 + Math.sin(this.rt * this.pFreq + this.pocketPh) * amp;
+      const f = this.pFreq, s = this.bandSeed || { a: 0, b: 0, c: 0 };
+      const n = (0.58 * Math.sin(tt * f * 0.61 + s.a)
+        + 0.30 * Math.sin(tt * f * 1.07 + s.b)
+        + 0.16 * Math.sin(tt * f * 1.73 + s.c)) / 1.04;
+      return Math.max(112, Math.min(158, 134 + n * amp));
+    },
+    pocketY() { return this.bandCenterAt(this.rt); },
+    // how far ahead (in seconds) the channel drawn at screen x will reach the rider —
+    // the wave streams leftward past him, so everything right of him is the near future
+    BAND_VIS: 150,
+
+    // ---- tricks -------------------------------------------------------------
+    trickZone() {
+      const rel = (this.py - this.pocketY()) / (this.band || 15);
+      if (Math.abs(rel) > 1.15) return null;     // outside the pocket — fix that first
+      if (rel < -0.34) return 'air';
+      if (rel > 0.34) return 'stance';
+      return 'spin';
+    },
+    trickName(kind) { return (TRICKS[game.rider] || TRICKS.boarder)[kind]; },
+    chainMult() { return 1 + Math.min(4, this.chain) * 0.35; },   // up to 2.4×
+    startTrick(kind) {
+      this.trickKind = kind;
+      this.trickT = 0;
+      this.trickDur = kind === 'air' ? 0.95 : kind === 'spin' ? 0.6 : 0;   // stance runs while held
+      this.airFrom = this.py;
+      this.stanceScore = 0;
+      if (kind === 'air') audio.tone(300, 0.45, { type: 'square', slide: 430, vol: 0.09 });
+      else if (kind === 'spin') audio.tone(520, 0.4, { type: 'square', slide: 320, vol: 0.08 });
+      else audio.tone(170, 0.3, { type: 'triangle', slide: 70, vol: 0.07 });
+    },
+    awardTrick(base, label) {
+      const b = Math.round(base * streakMult() * this.chainMult());
+      game.score += b;
+      this.chain++; this.trickCount++;
+      this.floaters.push({ txt: `${label} +${b}`, x: Math.min(210, this.pocketX()), y: this.py - 22, t: 1.5 });
+      audio.trick();
+    },
+    // Runs the active trick. Returns true while the rider is airborne (no bury, no drift).
+    updateTrick(dt) {
+      const k = this.trickKind;
+      if (!k) return false;
+      if (k === 'air') {
+        this.trickT += dt;
+        const u = Math.min(1, this.trickT / this.trickDur);
+        this.py = this.airFrom - Math.sin(u * Math.PI) * this.airH;
+        if (u >= 1) {
+          // the channel wandered while you were in the air — that's the whole risk
+          const off = Math.abs(this.py - this.pocketY());
+          if (off <= this.band) { this.awardTrick(900, this.trickName('air')); audio.splash(); }
+          else {
+            this.chain = 0;
+            this.buried = Math.max(this.buried, 0.3);
+            this.say('BLOWN LANDING', 'GET BACK IN THE POCKET', 1.2);
+            audio.noise(0.35, { vol: 0.11 });
+          }
+          this.trickKind = null; this.trickCd = 0.35;
+        }
+        return true;
+      }
+      if (k === 'spin') {
+        this.trickT += dt;
+        if (this.trickT >= this.trickDur) {
+          this.awardTrick(300, this.trickName('spin'));
+          this.trickKind = null; this.trickCd = 0.45;
+        }
+        return false;   // passive drift still applies — a greedy spin can bury you
+      }
+      // stance: held, scores per second, ends on release or when you slip out of the pocket
+      this.trickT += dt;
+      const holding = input.held('a') || (input.touch.active && !input.touch.dragging);
+      const inBand = Math.abs(this.py - this.pocketY()) <= this.band;
+      if (holding && inBand) {
+        const g = 240 * dt * streakMult() * this.chainMult();
+        game.score += g; this.stanceScore += g;
+      } else {
+        if (this.trickT >= 0.45 && this.stanceScore > 0) {
+          this.chain++; this.trickCount++;
+          this.floaters.push({ txt: `${this.trickName('stance')} +${Math.round(this.stanceScore)}`,
+            x: Math.min(210, this.pocketX()), y: this.py - 22, t: 1.5 });
+          audio.trick();
+        }
+        this.trickKind = null; this.trickCd = 0.3;
+      }
+      return false;
     },
 
     updateRide(dt) {
@@ -798,39 +920,46 @@ export function makeScenes(game) {
       // slow creep only — the foam never overruns the frame; speed reads via the streaming face
       this.foamX = Math.min(108, this.foamX + this.peel * dt * 0.4);
 
-      // spin trick (Phase 3): X kicks off a ~0.6s spin. You can't steer while spinning —
-      // the pocket keeps drifting, so a greedy spin can bury you. Max one per second.
-      if (this.spinCd > 0) this.spinCd -= dt;
-      if (this.spinT > 0) {
-        this.spinT -= dt;
-        if (this.spinT <= 0) {
-          const b = Math.round(250 * streakMult());
-          game.score += b;
-          this.floaters.push({ txt: `SPIN +${b}`, x: this.pocketX(), y: this.py - 22, t: 1.4 });
-          audio.trick();
-        }
-      } else {
-        if (input.pressed('a') && this.spinCd <= 0) {
-          this.spinT = 0.6; this.spinCd = 1.0;
-          audio.tone(520, 0.4, { type: 'square', slide: 320, vol: 0.08 });
-        }
-        // steering only when not spinning
+      // tricks (Phase 5): the band zone under you picks the move — see startTrick.
+      if (this.trickCd > 0) this.trickCd -= dt;
+      // touch has no "hold" button, so a finger parked down without dragging is the hold
+      if (input.touch.active && !input.touch.dragging) this.holdTouchT += dt;
+      else this.holdTouchT = 0;
+      const airborne = this.updateTrick(dt);
+      if (!this.trickKind && this.trickCd <= 0) {
+        const zone = this.trickZone();
+        const tapped = input.pressed('a');
+        if (zone === 'stance' && (input.held('a') || this.holdTouchT > 0.18)) this.startTrick('stance');
+        else if (zone && tapped) this.startTrick(zone);
+        else if (!zone && tapped) this.say('GET IN THE POCKET FIRST', null, 0.8);
+      }
+
+      // steering: none mid-air or mid-spin; half rate while you're set in the stance
+      if (!this.trickKind) {
         if (input.held('up')) this.py -= 75 * dt;
         if (input.held('down')) this.py += 90 * dt;
         if (input.touch.active) this.py += input.touch.dy * 1.4;
+      } else if (this.trickKind === 'stance') {
+        if (input.held('up')) this.py -= 38 * dt;
+        if (input.held('down')) this.py += 45 * dt;
+        if (input.touch.active && input.touch.dragging) this.py += input.touch.dy * 0.7;
       }
-      this.py += 20 * dt;   // passive drift always applies — the spin's risk
+      if (!airborne) this.py += 20 * dt;   // passive drift — the price of every trick
       input.touch.dy = 0;
-      this.py = Math.max(104, Math.min(166, this.py));
+      this.py = Math.max(airborne ? 56 : 104, Math.min(166, this.py));
 
       const off = Math.abs(this.py - this.pocketY());
       const band = this.band;   // per-rider pocket width (Phase 3)
-      if (off > band) this.buried += dt * (off > band + 12 ? 2.2 : 1);
-      else this.buried = Math.max(0, this.buried - dt * 1.6);
+      if (!airborne) {
+        if (off > band) this.buried += dt * (off > band + 12 ? 2.2 : 1);
+        else this.buried = Math.max(0, this.buried - dt * 1.6);
+      }
+      if (this.buried > 0.35) this.chain = 0;   // lose the pocket, lose the chain
 
-      if (this.rt > 0.6) {
+      if (this.rt > 0.6 && !airborne) {
         this.tubeTime += dt;
-        game.score += 60 * dt * stat().tube * (off <= band ? 1 : 0);
+        // passive points are now a trickle — tricks are how you actually score
+        game.score += 22 * dt * stat().tube * (off <= band ? 1 : 0);
       }
 
       if (this.buried > 0.95) {
@@ -839,15 +968,15 @@ export function makeScenes(game) {
         return;
       }
       if (this.rt >= this.rideLen) {
-        // made it all the way through — big tube bonus, plus a trick bonus on landing
-        const bonus = Math.round((500 + Math.round(this.tubeTime * 150)) * streakMult());
+        // made it all the way through — tube bonus + everything you landed on the way
+        const bonus = Math.round((500 + Math.round(this.tubeTime * 90) + this.trickCount * 120) * streakMult());
         game.score += bonus;
         game.made++;
         // a slot/clean ride made in full extends the streak; late drops already zeroed it
         if (this.dropTier !== 'late') game.streak++;
         if (game.daily) game.dailyGrid.push(this.dropTier);   // 🟩/🟦/🟨
         else if (game.made % 2 === 0) game.stage = Math.min(3, game.stage + 1);
-        this.say('SPIT OUT!', `TUBE ${this.tubeTime.toFixed(1)}s  +${bonus}`, 2.6);
+        this.say('SPIT OUT!', `${this.trickCount} TRICKS · TUBE ${this.tubeTime.toFixed(1)}s  +${bonus}`, 2.6);
         this.floaters.push({ txt: `+${bonus}`, x: this.pocketX(), y: this.py - 20, t: 1.4 });
         // exit cinematic: race ahead of the closing wall, then land the finishing trick
         this.mode = 'exit';
@@ -918,14 +1047,15 @@ export function makeScenes(game) {
       this.recConst = mode === 'ride'
         ? { wv: this.wv, dropDur: this.dropDur, dropY0: this.dropY0, band: this.band,
             pAmp: this.pAmp, lateAmp: this.lateAmp, pFreq: this.pFreq, pocketPh: this.pocketPh,
-            stage: game.stage }
+            bandSeed: this.bandSeed, airH: this.airH, stage: game.stage }
         : { wv: this.wv, lipX: this.lipX, takeX: this.takeX, pSpin: this.pSpin, stage: game.stage };
     },
     recSnap(mode) {
       if (this.recBuf.length > 900) return;   // ~15s cap — a bomb never runs this long
       this.recBuf.push(mode === 'ride'
-        ? { foamX: this.foamX, animT: this.animT, rt: this.rt, py: this.py,
-            dropT: this.dropT, spinT: this.spinT, buried: this.buried, tubeTime: this.tubeTime }
+        ? { foamX: this.foamX, animT: this.animT, rt: this.rt, py: this.py, dropT: this.dropT,
+            trickKind: this.trickKind, trickT: this.trickT, trickDur: this.trickDur,
+            airFrom: this.airFrom, chain: this.chain, buried: this.buried, tubeTime: this.tubeTime }
         : { pT: this.pT, animT: this.animT, shake: this.shake, pSmashed: this.pSmashed });
     },
     // Offer the replay. `next` is the normal flow (newWave / goto wipeout) run once we're done.
@@ -1324,24 +1454,53 @@ export function makeScenes(game) {
       const w = this.wv;
       // looser, gradient-shaded standing face: dark in the pocket, glassy toward the base
       const fg = faceGradient(ctx, SURFACE - w.A, SURFACE, p);
-      // full standing wave: broken behind the foam edge, open face ahead of it
+      // The wave is breaking BEHIND the rider and eating forward down the line: left of
+      // the edge it has already gone to whitewater; at the edge it's turning over right
+      // now, so blue bleeds through a boiling churn into white; ahead of that is clean
+      // blue face. The edge is ragged and breathes, so the break reads as a live thing
+      // chasing him rather than a straight cut.
+      const edge = foamX + Math.sin(this.animT * 3.1) * 2.5;
+      const CHURN = 38;                       // width of the blue → white transition
+      const taperAt = (x) => (x > foamX ? Math.max(0.55, 1 - ((x - foamX) / W) * 0.9) : 1);
       for (let x = 0; x < W; x += 2) {
-        const taper = x > foamX ? Math.max(0.55, 1 - ((x - foamX) / W) * 0.9) : 1;
-        const h = w.A * taper;
+        const h = w.A * taperAt(x);
         const top = SURFACE - h;
-        if (x < foamX) {
-          // whitewash — already broken
-          ctx.fillStyle = p.foam;
-          const jy = Math.round(top + Math.sin(x * 0.3 + this.animT * 14) * 4);
-          ctx.fillRect(x, jy, 2, H - jy);
-        } else {
-          ctx.fillStyle = fg;
-          ctx.fillRect(x, Math.round(top), 2, H - Math.round(top));
-          // glassy sheen low on the open face
+        // the break line is ragged and breathes — never a straight cut
+        const e = edge + Math.sin(x * 0.4 + this.animT * 9) * 3 + Math.sin(x * 0.13 - this.animT * 4) * 2;
+        ctx.fillStyle = fg;
+        ctx.fillRect(x, Math.round(top), 2, H - Math.round(top));
+        if (x >= e) {
+          // clean blue face ahead of the break — glassy sheen low on it
           ctx.fillStyle = 'rgba(180,224,248,0.12)';
           const my = Math.round(top + h * 0.55);
           ctx.fillRect(x, my, 2, H - my);
+        } else {
+          // behind the break the face is turning over: blue still showing through at the
+          // edge, whitening the further back you look, until it's pure tumbling whitewater
+          const m = Math.min(1, (e - x) / CHURN);
+          const jy = Math.round(top + Math.sin(x * 0.3 + this.animT * 14) * 4 * (1 - m * 0.6));
+          ctx.fillStyle = `rgba(248,252,255,${(0.18 + 0.82 * m * m).toFixed(3)})`;
+          ctx.fillRect(x, jy, 2, H - jy);
+          // aerated chunks boiling up through the face as it goes over
+          if (m < 1 && ((x * 7 + Math.floor(this.animT * 26)) % 11) < 4) {
+            ctx.fillStyle = `rgba(255,255,255,${(0.8 - 0.4 * m).toFixed(2)})`;
+            const cy = top + ((x * 17 + Math.floor(this.animT * 40)) % Math.max(6, Math.round(h * 0.7)));
+            ctx.fillRect(x, Math.round(cy), 2, 4);
+          }
         }
+      }
+      // white cap running along the crest right where it's toppling, and spray flung
+      // FORWARD off the break — the whitewater reaching down the line for the rider
+      ctx.fillStyle = p.foam;
+      for (let x = Math.max(0, Math.round(edge - CHURN)); x < Math.min(W, edge + 4); x += 2) {
+        const top = SURFACE - w.A * taperAt(x);
+        ctx.fillRect(x, Math.round(top) - 2, 2, 4 + Math.round(Math.abs(Math.sin(x * 0.35 + this.animT * 8)) * 5));
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      for (let i = 0; i < 8; i++) {
+        const sx = edge + 4 + ((this.animT * 90 + i * 21) % 40);
+        const sy = SURFACE - w.A * 0.88 + ((i * 23) % 40) + Math.sin(this.animT * 7 + i) * 3;
+        ctx.fillRect(Math.round(sx), Math.round(sy), 2, 2);
       }
       // motion: face texture and trough foam streaming past the rider
       ctx.fillStyle = 'rgba(255,255,255,0.15)';
@@ -1367,7 +1526,8 @@ export function makeScenes(game) {
       // the barrel: a hollow, ROUNDED tube. The top-heavy lip throws over from the crest,
       // curls down toward the shoulder to roof the cavity, and the mouth opens down the
       // line where the light gets in — that's the exit the rider is driving for.
-      const tubeL = Math.round(foamX - 14);
+      // starts at the break edge, not behind it, so the blue → white churn stays visible
+      const tubeL = Math.round(foamX + 4);
       const tubeR = pkX + 54;                       // wider mouth = a bigger, rounder barrel
       const crestY = SURFACE - w.A;
       const span = tubeR - tubeL;
@@ -1377,13 +1537,21 @@ export function makeScenes(game) {
         const f = Math.max(0, Math.min(1, (x - tubeL) / span));
         return crestY - 8 + f * f * (w.A * 0.5);    // drops toward mid-face — a real overhang
       };
-      // deep dark hollow under the overhang — nearly the full face at the throwing pit
+      // deep dark hollow under the overhang — nearly the full face at the throwing pit.
+      // Banded and fading at both ends so it reads as a cavity in the water rather than
+      // a painted rectangle sitting on top of the wave.
       for (let x = tubeL; x < tubeR; x += 2) {
         const f = (x - tubeL) / span;
-        const cy = lipCurve(x);
-        const depth = Math.round(w.A * (0.5 + 0.34 * Math.sin(f * Math.PI)));
-        ctx.fillStyle = 'rgba(4,10,34,0.62)';
-        ctx.fillRect(x, Math.round(cy), 2, depth);
+        const cy = Math.round(lipCurve(x));
+        const depth = Math.round(w.A * (0.42 + 0.34 * Math.sin(f * Math.PI)));
+        const a = 0.62 * Math.min(1, 2.4 * Math.sin(Math.min(1, f * 1.05) * Math.PI));
+        const b1 = Math.round(depth * 0.45), b2 = Math.round(depth * 0.32);
+        ctx.fillStyle = `rgba(4,10,34,${a.toFixed(3)})`;
+        ctx.fillRect(x, cy, 2, b1);
+        ctx.fillStyle = `rgba(6,14,44,${(a * 0.62).toFixed(3)})`;
+        ctx.fillRect(x, cy + b1, 2, b2);
+        ctx.fillStyle = `rgba(8,18,54,${(a * 0.28).toFixed(3)})`;
+        ctx.fillRect(x, cy + b1 + b2, 2, depth - b1 - b2);
       }
       // bright spot down the line — the light at the end of the tube, framed by the cavity
       const exitY = crestY + Math.round(w.A * 0.5);
@@ -1407,12 +1575,26 @@ export function makeScenes(game) {
         const len = 10 + Math.round(Math.sin(this.animT * 10 + i * 2) * 6) + i * 4;
         ctx.fillRect(dx, Math.round(lipCurve(dx)), 2, len);
       }
-      // pocket band — where you need to be (width is per-rider, Phase 3)
+      // ---- the pocket channel: the wave surging under you ----------------------
+      // Drawn the whole way down the line using look-ahead, so the wander is something
+      // you can SEE coming and set up for instead of a gotcha. Brightest at the rider.
       const pyT = this.pocketY();
       const bnd = this.band || 15;
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.fillRect(pkX - 8, Math.round(pyT - bnd), 26, 1);
-      ctx.fillRect(pkX - 8, Math.round(pyT + bnd), 26, 1);
+      for (let x = Math.max(0, Math.round(foamX - 10)); x < W; x += 4) {
+        const c = this.bandCenterAt(this.rt + (x - pkX) / this.BAND_VIS);
+        const near = Math.max(0.18, 1 - Math.abs(x - pkX) / 150);
+        ctx.fillStyle = `rgba(180,240,255,${(0.10 * near).toFixed(2)})`;
+        ctx.fillRect(x, Math.round(c - bnd) + 1, 3, Math.round(bnd * 2) - 1);
+        ctx.fillStyle = `rgba(255,255,255,${(0.55 * near).toFixed(2)})`;
+        ctx.fillRect(x, Math.round(c - bnd), 3, 1);
+        ctx.fillRect(x, Math.round(c + bnd), 3, 1);
+      }
+      // solid brackets at the rider so "am I in it?" is never ambiguous — neutral while
+      // he's airborne, since being out of the band is the point of an air
+      ctx.fillStyle = this.trickKind === 'air' ? 'rgba(248,216,72,0.9)'
+        : Math.abs(this.py - pyT) <= bnd ? 'rgba(140,232,160,0.9)' : 'rgba(248,88,56,0.9)';
+      ctx.fillRect(pkX - 10, Math.round(pyT - bnd), 24, 1);
+      ctx.fillRect(pkX - 10, Math.round(pyT + bnd), 24, 1);
       // rider — sometimes swallowed by the curtain, riding through it
       const deep = Math.sin(this.rt * 1.7 + this.pocketPh) > 0.15;
       if (this.dropT > 0) {
@@ -1433,10 +1615,10 @@ export function makeScenes(game) {
         for (let i = 1; i <= 6; i++) {
           ctx.fillRect(pkX - 6 + (i % 2) * 6, Math.round(this.py) - i * 9, 3, 5);
         }
-      } else if (this.spinT > 0) {
-        // spinning: surfer uses the arms-out frame, boarder just rotates the ride frame
-        const rot = (1 - this.spinT / 0.6) * Math.PI * 2;
-        const key = game.rider === 'surfer' ? 'sp_s_spin' : riderKey('ride');
+      } else if (this.trickKind === 'spin') {
+        // 360 flat on the face — surfer uses the arms-out frame, boarder rotates the ride frame
+        const rot = Math.min(1, this.trickT / (this.trickDur || 0.6)) * Math.PI * 2;
+        const key = trickArt('spin', game.rider === 'surfer' ? 'sp_s_spin' : riderKey('ride'));
         if (!drawRiderImg(ctx, key, pkX, this.py, rot)) {
           ctx.save();
           ctx.translate(pkX, Math.round(this.py));
@@ -1444,13 +1626,56 @@ export function makeScenes(game) {
           drawMap(ctx, spr().ride, -16, -5, 2, true);
           ctx.restore();
         }
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';   // spray ring off the rail as he pivots
+        for (let i = 0; i < 6; i++) {
+          const a = rot + i * 1.05;
+          ctx.fillRect(Math.round(pkX + Math.cos(a) * 16), Math.round(this.py + Math.sin(a) * 8), 2, 2);
+        }
+      } else if (this.trickKind === 'air') {
+        // launched off the lip: airborne, rotating, growing as he leaves the face
+        const u = Math.min(1, this.trickT / (this.trickDur || 0.95));
+        const lift = Math.sin(u * Math.PI);
+        const rot = u * Math.PI * 2;
+        const key = trickArt('air', game.rider === 'surfer' ? 'sp_s_spin' : riderKey('drop'));
+        ctx.fillStyle = 'rgba(8,16,48,0.28)';      // shadow marks where he has to come down
+        ctx.fillRect(pkX - 9, Math.round(this.airFrom) + 6, 18, 3);
+        if (!drawRiderImg(ctx, key, pkX + lift * 6, this.py, rot, 0, 1 + lift * 0.18)) {
+          ctx.save();
+          ctx.translate(pkX, Math.round(this.py));
+          ctx.rotate(rot);
+          drawMap(ctx, spr().ride, -16, -5, 2, true);
+          ctx.restore();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';   // launch spray left behind at the lip
+        for (let i = 0; i < 6; i++) {
+          ctx.fillRect(Math.round(pkX - 10 + (i % 3) * 6), Math.round(this.airFrom + 2 + (i % 2) * 3), 3, 2);
+        }
+      } else if (this.trickKind === 'stance') {
+        // knee drop (boarder) / lay-back (surfer): set low and leaning into the face with
+        // the trailing hand carving a spray line off the water
+        // once the real pose exists the lean is baked into the art — don't double it up
+        const key = trickArt('stance', null);
+        const lean = (key ? 0 : (game.rider === 'surfer' ? 0.34 : -0.26)) + Math.sin(this.animT * 12) * 0.03;
+        if (!drawRiderImg(ctx, key || riderKey('ride'), pkX, this.py + 2, lean)) {
+          ctx.save();
+          ctx.translate(pkX, Math.round(this.py + 2));
+          ctx.rotate(lean);
+          drawMap(ctx, spr().ride, -16, -5, 2, true);
+          ctx.restore();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        for (let i = 0; i < 9; i++) {
+          ctx.fillRect(Math.round(pkX - 6 - i * 5),
+            Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10) * 2), 3, 2);
+        }
       } else if (!drawRiderImg(ctx, riderKey('ride'), pkX, this.py)) {
         drawMap(ctx, spr().ride, pkX - 10, this.py - 6, 2, true);
       }
       if (deep && this.rt > 0.6) {
-        ctx.fillStyle = 'rgba(248,248,240,0.6)';
+        // the curtain washing over him — light enough to still read the rider through it
+        ctx.fillStyle = 'rgba(248,248,240,0.3)';
         for (let i = 0; i < 5; i++) {
-          ctx.fillRect(pkX - 12 + i * 6, SURFACE - w.A + 10 + ((i * 13) % 8), 3, w.A - 8);
+          ctx.fillRect(pkX - 12 + i * 6, SURFACE - w.A + 10 + ((i * 13) % 8), 3, Math.round(w.A * 0.7));
         }
       }
       // spray off the bottom turn
@@ -1467,12 +1692,16 @@ export function makeScenes(game) {
         ctx.fillStyle = '#f85838';
         ctx.fillRect(44, 31, Math.round(Math.min(1, this.buried / 0.95) * 40), 5);
       }
-      if (this.spinT > 0) text(ctx, 'SPIN!', W / 2, 40, 13, '#8ce8a0', 'center');
-      if (this.rt < 3) text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 224, 8, '#f8f890', 'center');
-      else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
+      if (this.trickKind) text(ctx, this.trickName(this.trickKind), W / 2, 40, 13, '#8ce8a0', 'center');
+      if (this.chain > 0) text(ctx, `CHAIN ${this.chain} · x${this.chainMult().toFixed(2)}`, 6, 42, 7, '#8ce8a0');
+      if (this.rt < 3.2) {
+        text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
+        text(ctx, input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW=DRAG' : 'X — HIGH=AIR · MID=SPIN · HOLD LOW=DRAG',
+          W / 2, 225, 7, '#8ce8a0', 'center');
+      } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
         text(ctx, this.py > pyT ? 'GO UP ↑' : 'GO DOWN ↓', W / 2, 224, 9, '#f85838', 'center');
       } else if (Math.floor(this.animT * 2) % 2) {
-        text(ctx, input.usedTouch ? 'TAP = SPIN TRICK' : 'X = SPIN TRICK', W / 2, 224, 8, '#8ce8a0', 'center');
+        text(ctx, 'WORK THE BAND — TRICKS SCORE', W / 2, 224, 8, '#8ce8a0', 'center');
       }
     },
 
