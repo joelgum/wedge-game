@@ -32,6 +32,7 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 
 ### Watch — read the set (build-up)
 - You're already sitting in the lineup; the camera holds one view. Waves build from the horizon and roll through **left → right** behind the other riders, so you feel the set approaching.
+- **The lineup is a mixed crowd** (2026-07-26): each of the three locals rolls bodyboarder or bodysurfer at the start of a run and keeps it, whichever rider you picked — so you're always sitting with a mix. Whoever takes the interstitial NPC wave goes as whatever he is.
 - The whole skill is a **single shifting ideal takeoff spot**: the peak wanders across the face, and from Afternoon on, the wedge backwash **flips its direction once** mid-build. Slide ←→ (or drag) to stay under the marker.
 - **The tell is crest feathering:** a makeable wave feathers (spits spray) only near the peak; a closeout feathers all the way across — don't go on those.
 - A **SET meter** fills as the wave stands up; it arrives whether you're ready or not.
@@ -48,13 +49,17 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 - The foam curtain chases from behind on the **left**; sometimes it swallows the rider and he comes back out through the tube. A late drop adds a ~1.2s decaying chaos window. Fall out of the pocket too long = BURIED (wipeout).
 
 ### Tricks — one button, the band picks the move (Phase 5, 2026-07-26)
-Where you sit in the pocket band when you press X / tap decides the trick. Same three zones for both riders, so the input never changes — only the move does.
+Where you sit in the pocket band when you press X / tap decides the trick. One button for both riders, so the input never changes — only the move does.
 
 | Band zone | Bodyboarder | Bodysurfer | Notes |
 |---|---|---|---|
-| High (by the lip) | AIR — launch, one rotation, land back in the band | EL ROLLO | Landing outside the band = no score, chain reset, BURIED clock starts. The channel wanders while you're airborne — that's the risk. |
-| Middle | 360 SPIN on the face | BODY ROTATION | ~0.6s, no steering, drift keeps running. |
+| High (by the lip) | AIR — launch, one rotation, land back in the band | *(no air — folds into the prone 360)* | Landing outside the band = no score, chain reset, BURIED clock starts. The channel wanders while you're airborne — that's the risk. |
+| Middle | 360 SPIN, **prone** on the face | PRONE 360, body flat and planing | 0.75s, no steering, drift keeps running. |
 | Low (trough), **held** | KNEE DROP + hand drag | LAY-BACK, arm spread | Scores per second while held and in the band; steering drops to half. |
+
+**The bodysurfer never leaves the water** (2026-07-26 revision, Joel's call): he has no air, so his top-of-band tap gives the prone 360 as well. Both riders' 360s are **prone** — the arms-out `spr_s_spin.png` is the pitched-wipeout ragdoll and is not a trick frame. That split leaves the boarder as the trick scorer and the bodysurfer as the tube/exit scorer, which is what `RIDER_STATS` already encodes (tube 1.4×, exit 1.25×).
+
+**Every trick but the air runs 25% longer** (`TRICK_SLOW`), and that drawn-out time costs ground: the drawn break edge creeps up to 9px closer to the rider while a slow trick is running and eases back once he's trimming again. Pressure you can see — the rider holds his screen position and the whitewater still can never overtake him.
 
 **Tricks lead the scoring.** Passive in-pocket points were cut (60/s → 22/s); linking tricks without losing the pocket builds a **chain multiplier** (1 + 0.35 per link, capped 2.4×) that stacks on the wave streak. Buried > 0.35 or a blown air landing resets the chain. Kick-out bonus now counts the tricks landed.
 - Hold the pocket to the end and you get blasted out ahead of the spit — **the wall shuts down behind you: MADE IT** (kick-out bonus), then the next wave rolls in.

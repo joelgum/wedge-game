@@ -4,8 +4,9 @@
 
 **[Play it live →](https://wedge-game.vercel.app)**
 
-An NES-style arcade game in one continuous view: you float in the lineup at The Wedge,
-waves build behind the riders and peel left to right, and you read each one — track the
+An NES-style arcade game in one continuous view: you float in the lineup at The Wedge
+alongside a mixed crowd of spongers and bodysurfers, waves build behind the riders and
+peel left to right, and you read each one — track the
 shifting takeoff spot on makeable waves, let the closeouts pass, and hold the pocket
 through the tube. 3 lives. See [PLAN.md](PLAN.md) for the original design (v2 loop below).
 
@@ -36,15 +37,22 @@ A white box shows where the game thinks your finger is.
 
 | Where you are in the pocket band | Bodyboarder | Bodysurfer |
 |---|---|---|
-| **High** (up by the lip) | AIR — launch, rotate, land back in the band | EL ROLLO |
-| **Middle** | 360 SPIN on the face | BODY ROTATION |
+| **High** (up by the lip) | AIR — launch, rotate, land back in the band | *no air* — gives the prone 360 too |
+| **Middle** | 360 SPIN, prone on the face | PRONE 360, flat and planing |
 | **Low** (in the trough), **hold it** | KNEE DROP + hand drag | LAY-BACK, arm spread |
+
+The bodysurfer never leaves the water, so he has two moves to the boarder's three — he
+makes it back in the tube and off the kick-out, where his multipliers are higher.
 
 Tricks are the main way you score. Linking them without losing the pocket builds a
 **chain multiplier** (up to 2.4×) on top of the wave streak. You can't steer mid-trick and
 the drift never stops, so a greedy trick buries you — and an air that comes down outside
 the band scores nothing and starts the BURIED clock, because the channel wanders while
 you're up there.
+
+Everything except the air is a **drawn-out move**, and the break eats that time back in
+ground: the whitewater closes right up on your tail while you're spinning or set in the
+stance, and drops off again once you're trimming. It still can't overtake you.
 
 ## Reading the wave
 

@@ -113,7 +113,27 @@ cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfbo
 bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 5 — `spr_s_prone.png` (optional re-roll) · lead hand out front, planing
+### 5 — `spr_s_spin360.png` · PRONE 360 spin on the face
+> The bodysurfer's only rotating trick, at every height in the band (he has no air — he
+> never leaves the water). The game spins this frame a full turn, so like the boarder's
+> spin frame it has to read upside down. **Prone** — never the arms-out ragdoll pose,
+> which the game reserves for getting pitched.
+
+```
+8-bit pixel art game sprite of a 1980s bodysurfer spinning a flat 360 on the face of a
+wave, no surfboard and no bodyboard and no handplane, bare hands, body prone and rigid
+and streamlined flat on the water surface, both arms pinned in tight along his ribs, body
+kept symmetrical and compact so the pose reads at any rotation, short swim fins together
+and trailing close to the body, head tucked slightly, dark hair, teal trunks, a small ring
+of spray flicking off his shoulder and hip as he pivots, NES video game style 1987, limited
+16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single
+figure, viewed from slightly above and to the side facing RIGHT, centered on a plain solid
+magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
+standing surfer, surfboard, bodyboard, handplane, arms spread wide, airborne, multiple
+figures, grid, reference sheet, text, watermark
+```
+
+### 6 — `spr_s_prone.png` (optional re-roll) · lead hand out front, planing
 > The second half of the move you described — hand back out in FRONT, body planing down
 > the line. The game already has this frame (`spr_s_prone.png`) and uses it for both the
 > paddle and the ride. Only re-roll it if you want the lead hand more pronounced.
@@ -131,10 +151,10 @@ cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfbo
 bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 6 — bodysurfer air / EL ROLLO — **no prompt needed**
-The existing arms-out `spr_s_spin.png` already covers both the mid-band body rotation and
-the top-of-band el rollo (the game rotates it). Generate a dedicated one only if you want
-them visually distinct.
+### 7 — bodysurfer air — **there isn't one**
+The bodysurfer has no air trick; he stays on the water, so his top-of-band tap gives the
+prone 360 as well. `spr_s_spin.png` (arms-out "U") is **not** a trick frame — it's the
+ragdoll toss when a wave pitches you, and nothing else should use it.
 
 ---
 
