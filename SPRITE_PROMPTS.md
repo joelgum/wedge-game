@@ -113,27 +113,50 @@ cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfbo
 bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 5 — `spr_s_spin360.png` · PRONE 360 spin on the face
-> The bodysurfer's only rotating trick, at every height in the band (he has no air — he
-> never leaves the water). The game spins this frame a full turn, so like the boarder's
-> spin frame it has to read upside down. **Prone** — never the arms-out ragdoll pose,
-> which the game reserves for getting pitched.
+### 5 — `spr_s_roll.png` · PRONE 360 ROLL down the line
+> His mid-band move, and the same move he finishes a ride with. **Not a cartwheel** — he
+> turns about his own long axis, like a barrel roll, arms up near his head for momentum.
+> The game fakes the roll by squashing this frame vertically through `cos(roll)`, so it is
+> drawn full-height, then edge-on, then **upside down**: the pose has to read belly-up as
+> well as belly-down. Never the arms-out ragdoll pose, which the game reserves for getting
+> pitched.
 
 ```
-8-bit pixel art game sprite of a 1980s bodysurfer spinning a flat 360 on the face of a
-wave, no surfboard and no bodyboard and no handplane, bare hands, body prone and rigid
-and streamlined flat on the water surface, both arms pinned in tight along his ribs, body
-kept symmetrical and compact so the pose reads at any rotation, short swim fins together
-and trailing close to the body, head tucked slightly, dark hair, teal trunks, a small ring
-of spray flicking off his shoulder and hip as he pivots, NES video game style 1987, limited
-16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single
-figure, viewed from slightly above and to the side facing RIGHT, centered on a plain solid
-magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
-standing surfer, surfboard, bodyboard, handplane, arms spread wide, airborne, multiple
-figures, grid, reference sheet, text, watermark
+8-bit pixel art game sprite of a 1980s bodysurfer mid barrel roll on the face of a wave,
+rolling about the long axis of his own body, no surfboard and no bodyboard and no
+handplane, bare hands, body prone and rigid and streamlined flat along the water, both
+arms raised up alongside his head and slightly bent to drive the roll, torso and hips
+turning over as one line, short swim fins together and trailing close to the body, body
+kept symmetrical top to bottom so the pose still reads when it is flipped upside down,
+dark hair, teal trunks, a small ring of spray flicking off his shoulder and hip as he
+comes over, NES video game style 1987, limited 16-color palette, chunky pixels, flat
+shading, no anti-aliasing, no gradients, single figure, viewed from the side facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, standing surfer, surfboard, bodyboard, handplane, arms spread wide,
+cartwheel, airborne, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 6 — `spr_s_prone.png` (optional re-roll) · lead hand out front, planing
+### 6 — `spr_s_tube.png` · coming out of the barrel
+> His top-of-band move, where the boarder has an air: he pulls up under the curtain,
+> disappears behind it, and gets spat out down the line. The game hides him for the middle
+> of the move and draws this frame on the way in (nose-up) and on the way out (level, with
+> a jet of mist behind him), so it wants to read as **driving forward hard**, not floating.
+
+```
+8-bit pixel art game sprite of a 1980s bodysurfer being spat out of a barrelling wave, no
+surfboard and no bodyboard and no handplane, bare hands, body prone and stretched out low
+and flat and streamlined, lead arm punched straight out in FRONT of him with the flat of
+the hand planing hard on the water, trailing arm locked tight along his hip, chin up and
+head driving forward down the line, chest just clear of the surface, short swim fins
+together and kicked straight out behind him, dark hair, teal trunks, a burst of spray and
+mist trailing off his fins from behind, NES video game style 1987, limited 16-color
+palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side
+view facing RIGHT, centered on a plain solid magenta background for easy cutout --ar 1:1
+--no photorealism, blur, smooth shading, standing surfer, surfboard, bodyboard, handplane,
+arms spread wide, airborne, multiple figures, grid, reference sheet, text, watermark
+```
+
+### 7 — `spr_s_prone.png` (optional re-roll) · lead hand out front, planing
 > The second half of the move you described — hand back out in FRONT, body planing down
 > the line. The game already has this frame (`spr_s_prone.png`) and uses it for both the
 > paddle and the ride. Only re-roll it if you want the lead hand more pronounced.
@@ -151,10 +174,15 @@ cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfbo
 bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 7 — bodysurfer air — **there isn't one**
-The bodysurfer has no air trick; he stays on the water, so his top-of-band tap gives the
-prone 360 as well. `spr_s_spin.png` (arms-out "U") is **not** a trick frame — it's the
-ragdoll toss when a wave pitches you, and nothing else should use it.
+### 8 — bodysurfer air — **there isn't one**
+The bodysurfer has no air trick; he stays on the water, so his top-of-band tap pulls him
+into the barrel instead (`spr_s_tube.png`). `spr_s_spin.png` (arms-out "U") is **not** a
+trick frame — it's the ragdoll toss when a wave pitches you, and nothing else should use it.
+
+### The locals need no new art
+Right-of-way waves and the interstitial NPC beat draw the other riders from the frames
+already in `assets/` (`spr_b_*` / `spr_s_*`), picked by that local's own type. Nothing to
+generate for them.
 
 ---
 
@@ -167,5 +195,7 @@ ragdoll toss when a wave pitches you, and nothing else should use it.
   finer, downscale to ~32 px tall with **nearest-neighbour** before cutting out.
 - **Palette:** flat blocks, no soft shading. AI "pixel art" is usually faux-pixel with
   thousands of colours — palette-snap to 16 in Aseprite/Piskel if it's soft.
-- **Spin frame only:** cover it with your thumb and rotate the image 180° — if it still
-  reads as a rider it will survive the in-game rotation.
+- **Boarder's spin frame:** cover it with your thumb and rotate the image 180° — if it
+  still reads as a rider it will survive the in-game rotation.
+- **Bodysurfer's roll frame:** flip it *vertically* (mirror top-to-bottom), not rotate.
+  That's exactly what the game does to it mid-roll, and it has to still read belly-up.

@@ -37,12 +37,13 @@ A white box shows where the game thinks your finger is.
 
 | Where you are in the pocket band | Bodyboarder | Bodysurfer |
 |---|---|---|
-| **High** (up by the lip) | AIR — launch, rotate, land back in the band | *no air* — gives the prone 360 too |
-| **Middle** | 360 SPIN, prone on the face | PRONE 360, flat and planing |
+| **High** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
+| **Middle** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
 | **Low** (in the trough), **hold it** | KNEE DROP + hand drag | LAY-BACK, arm spread |
 
-The bodysurfer never leaves the water, so he has two moves to the boarder's three — he
-makes it back in the tube and off the kick-out, where his multipliers are higher.
+The bodysurfer never leaves the water: where the boarder goes over the lip, he goes under
+it. Same bargain either way — you're out of your own hands for a beat while the channel
+keeps wandering, and you have to come back to it.
 
 Tricks are the main way you score. Linking them without losing the pocket builds a
 **chain multiplier** (up to 2.4×) on top of the wave streak. You can't steer mid-trick and
@@ -56,6 +57,11 @@ stance, and drops off again once you're trimming. It still can't overtake you.
 
 ## Reading the wave
 
+- **Someone else's wave.** Roughly one in five makeable waves, a local swings deep and
+  starts stroking for it — he ends up on your left, nearer the peak, labelled **HIS WAVE**.
+  He has the right of way. Let it go for +150, or take off and use the drop to bail out:
+  **X / tap = PULL BACK**, +250 and he gets the wave. Ride it anyway and he'll scream past
+  on the inside while the lip throws you over — *DON'T SNAKE WAVES, KOOK.*
 - **Feathering only near the peak** = makeable. A blinking ▼ marker appears on the
   shoulder — get under it and commit (X). Closer to dead-center = bigger drop bonus.
 - **Feathering across the whole crest** = closeout. Don't go — letting it pass pays +150.

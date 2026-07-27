@@ -67,12 +67,14 @@ const RIDER_ART = {
 // loadImg('sp_b_air', 'spr_b_air.png');       // boarder — airborne, rail grab
 // loadImg('sp_b_knee', 'spr_b_knee.png');     // boarder — knee drop + hand drag
 // loadImg('sp_s_layback', 'spr_s_layback.png'); // bodysurfer — lay-back, arm spread
-// loadImg('sp_s_spin360', 'spr_s_spin360.png'); // bodysurfer — PRONE 360 on the face
+// loadImg('sp_s_roll', 'spr_s_roll.png');       // bodysurfer — PRONE 360 ROLL, arms up by the head
+// loadImg('sp_s_tube', 'spr_s_tube.png');       // bodysurfer — coming out of the barrel
 const TRICK_ART = {
   boarder: { spin: 'sp_b_spin', air: 'sp_b_air', stance: 'sp_b_knee' },
-  // no air for the bodysurfer — he stays on the water; his 360 is done PRONE, so the
-  // stand-in is the prone frame rotated, never the arms-out ragdoll toss (sp_s_spin).
-  surfer: { spin: 'sp_s_spin360', stance: 'sp_s_layback' },
+  // no air for the bodysurfer — he stays on the water. His 360 is a PRONE ROLL about his
+  // long axis (not a flat cartwheel), so the stand-in is the prone frame flipped through
+  // cos(roll), never the arms-out ragdoll toss (sp_s_spin).
+  surfer: { spin: 'sp_s_roll', tube: 'sp_s_tube', stance: 'sp_s_layback' },
 };
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
@@ -82,14 +84,16 @@ const RIDER_STATS = {
   surfer: { band: 0.85, tube: 1.4, exit: 1.25 },
 };
 // Phase 5 tricks: ONE button, and where you sit in the pocket band picks the move.
-//   top of the band (up by the lip) → AIR    · launch, rotate, land back in the band
-//   middle of the band             → SPIN   · 360 flat on the face, PRONE for both riders
+//   top of the band (up by the lip) → AIR / TUBE · boarder launches off the lip; the
+//                                     bodysurfer pulls up under the curtain and gets spat out
+//   middle of the band             → SPIN   · boarder spins flat, bodysurfer rolls prone
 //   bottom of the band (trough)    → STANCE · HOLD it: knee-drop hand-drag / lay-back
-// The bodysurfer has no air (he never leaves the water), so his top zone folds into the
-// spin — the button always does something, and the zone map never changes shape.
+// Both riders have three moves. The bodysurfer never leaves the water, so where the
+// boarder goes airborne he goes INTO the wave instead — same risk shape (he's out of
+// your hands for a beat and the channel wanders), different move.
 const TRICKS = {
   boarder: { air: 'AIR!', spin: '360 SPIN!', stance: 'KNEE DROP' },
-  surfer: { spin: 'PRONE 360!', stance: 'LAY-BACK' },
+  surfer: { tube: 'SPAT OUT!', spin: '360 ROLL!', stance: 'LAY-BACK' },
 };
 // Every trick but the air runs 25% longer than it used to — the move draws out, and the
 // break eats that time back in ground (see foamCreep in updateRide).
@@ -106,6 +110,23 @@ function drawRiderImg(ctx, key, cx, cy, rot = 0, dy = 0, scale = 1) {
   ctx.translate(Math.round(cx), Math.round(cy + dy));
   if (rot) ctx.rotate(rot);
   if (scale !== 1) ctx.scale(scale, scale);
+  ctx.drawImage(img, Math.round(-w / 2), Math.round(-h / 2));
+  ctx.restore();
+  return true;
+}
+
+// A LENGTHWISE roll — the body turning about its own long axis, not a flat cartwheel.
+// Faked by scaling vertically through cos(roll): full height on top, a thin edge at 90°,
+// inverted underneath. This is the bodysurfer's 360 (and his kick-out roll), so both
+// read the same way. Returns false if the art hasn't loaded, same contract as above.
+function drawRollImg(ctx, key, cx, cy, roll, scale = 1) {
+  const img = IMG[key];
+  if (!(img && img.complete && img.naturalWidth > 0)) return false;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.translate(Math.round(cx), Math.round(cy));
+  ctx.scale(scale, Math.cos(roll) * scale);
   ctx.drawImage(img, Math.round(-w / 2), Math.round(-h / 2));
   ctx.restore();
   return true;
@@ -389,6 +410,15 @@ export function makeScenes(game) {
           game.bombUsed = true;
         }
       }
+      // Right-of-way wave (~1 in 5): one of the locals is deeper than you and going. Surf
+      // etiquette gives the wave to whoever is closest to the peak — here that's him, on
+      // your left. You can still take off, but that's snaking, and it ends badly. Never on
+      // a monster (that beat owns its own drama), never on a closeout, and not while the
+      // first two waves are still teaching the basic read.
+      this.snake = (this.wv.makeable && !this.wv.monster && game.wave >= 3 && rand() < 0.2)
+        ? { idx: Math.min(2, Math.floor(rand() * 3)), x: null, called: false, yielded: false }
+        : null;
+      if (this.snake) this.snake.x = this.riders[this.snake.idx].x;
       this.committed = false;
       this.rumbled = false;
       this.holdT = 0;   // brief peak-drift freeze while a teaching callout is up (Phase 1)
@@ -401,7 +431,7 @@ export function makeScenes(game) {
       // smashes them, a small one runs clean. Free wave-reading lessons between turns.
       // Skipped in daily (fixed 10-wave cadence) and ahead of the bomb (its intro owns
       // the drama). Your wave's clock (wv.t = 0) doesn't start until the beat ends.
-      if (!game.daily && game.wave >= 3 && !this.wv.rideable && Math.random() < 0.33) this.startNpc();
+      if (!game.daily && game.wave >= 3 && !this.wv.rideable && !this.snake && Math.random() < 0.33) this.startNpc();
     },
 
     peakX() { return this.wv.peak; },
@@ -483,6 +513,25 @@ export function makeScenes(game) {
         }
         if (w.flipAt && w.t >= w.flipAt) { w.drift = -w.drift; w.flipAt = 0; }
       }
+      // Right-of-way tell: the deeper rider swings in toward the peak and starts stroking
+      // for it well before the rest of the pack, so "someone else is already on this one"
+      // is something you can SEE before you decide. His lineup spot is untouched — only
+      // the drawn position moves (see drawWatch).
+      if (this.snake && !this.committed && this.q() > 0.42) {
+        // just inside the peak — and clear of whoever else is sitting there, so the one
+        // rider who matters isn't drawn on top of a neighbour
+        let want = this.peakX() - 26;
+        for (let i = 0; i < this.riders.length; i++) {
+          if (i !== this.snake.idx && Math.abs(this.riders[i].x - want) < 18) want = this.riders[i].x - 20;
+        }
+        want = Math.max(30, want);
+        const dx = want - this.snake.x;
+        this.snake.x += Math.sign(dx) * Math.min(Math.abs(dx), 52 * dt);
+        if (!this.snake.called) {
+          this.snake.called = true;
+          this.say('HE\'S DEEPER — HIS WAVE', 'RIGHT OF WAY  ·  LET HIM HAVE IT', 1.8);
+        }
+      }
       // the ocean announces the wave standing up — a rideable BOMB rumbles early (Phase 4),
       // the learnable tell that this monster is on rather than a trap
       if (!this.rumbled && this.q() > (w.rideable ? 0.55 : 0.75)) {
@@ -516,7 +565,8 @@ export function makeScenes(game) {
       const mult = streakMult();
       if (!this.committed) {
         // letting waves go never touches the streak (GOOD CALL / WAVE WASTED)
-        if (w.monster) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
+        if (this.snake) { game.score += 150; audio.select(); this.yieldWave('GOOD CALL', 'HIS WAVE — YOU LET HIM HAVE IT  +150'); }
+        else if (w.monster) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
         else if (w.makeable) { this.say('WAVE WASTED', 'DUDE, THAT WAS THE ONE'); this.recordAndAdvance('waste'); }
         else { game.score += 150; this.say('GOOD CALL', 'CLOSEOUT — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
       } else if (w.monster) {
@@ -525,6 +575,11 @@ export function makeScenes(game) {
         this.isBomb = true;
         if (w.rideable && d <= tol) { this.rideBomb(); this.beginRecord('ride'); }
         else { this.startPitch(); this.beginRecord('pitch'); }   // off-slot bomb / trap monster — over the falls
+      } else if (this.snake) {
+        // his wave. Taking it earns you nothing wherever you took off from — the drop
+        // bonus is for waves that were yours. Pull back during the drop or wear it.
+        this.say('YOU WENT ANYWAY...', 'HE WAS ALREADY UP', 1.6);
+        this.startRide(false, 'clean');
       } else if (!w.makeable) {
         game.goto('wipeout', { reason: 'CLOSED OUT!', detail: 'THAT WAVE WAS A WALL — NO EXIT',
           mark: { px: this.px, wall: true } });
@@ -582,23 +637,47 @@ export function makeScenes(game) {
     //      them; a clearly-smaller one runs clean down the line. ~4s focus beat, then
     //      your wave builds as normal (its clock was held at 0 the whole time).
     npcPhase() { return { STAND: 1.2, DROP: 1.9, TOSS: 2.8, END: 4.0 }; },
-    startNpc() {
+    //      Also reused to play out a right-of-way wave you gave up (see yieldWave): opts
+    //      pin down who goes, how big it is, the headline, and what happens after.
+    startNpc(opts = {}) {
       this.mode = 'npc';
       this.nT = 0;
-      this.nMake = Math.random() < 0.5;                     // small runner vs walled smash
-      this.nPeak = 70 + Math.random() * 100;
-      this.nA = this.nMake ? 46 + Math.random() * 10 : 88 + Math.random() * 18;
+      this.nMake = opts.make !== undefined ? opts.make : Math.random() < 0.5;   // runner vs walled smash
+      this.nPeak = opts.peak !== undefined ? opts.peak : 70 + Math.random() * 100;
+      this.nA = opts.A !== undefined ? opts.A
+        : (this.nMake ? 46 + Math.random() * 10 : 88 + Math.random() * 18);
       this.nTakeX = this.nPeak + (this.nMake ? 18 : 6);     // runner starts on the shoulder
       this.nSpin = Math.random() < 0.5 ? -1 : 1;
       this.nDone = false;                                   // outcome shown yet?
       this.shake = 0;
-      // hide the nearest lineup rider — that's who's going
-      let best = 0, bd = 1e9;
-      this.riders.forEach((r, i) => { const d = Math.abs(r.x - this.nTakeX); if (d < bd) { bd = d; best = i; } });
+      this.nAfter = opts.after || null;                     // where to go when the beat ends
+      // hide whoever's going: the named rider on a right-of-way wave, otherwise the
+      // lineup rider nearest the takeoff spot
+      let best = opts.idx;
+      if (best === undefined) {
+        let bd = 1e9;
+        best = 0;
+        this.riders.forEach((r, i) => { const d = Math.abs(r.x - this.nTakeX); if (d < bd) { bd = d; best = i; } });
+      }
       this.nHide = best;
       this.nType = this.riders[best].type || 'boarder';     // he goes as whatever he is
-      this.say(this.nMake ? 'GOING ON A SMALL ONE...' : 'GOING ON A WALLED ONE...', null, 1.5);
+      this.say(opts.msg || (this.nMake ? 'GOING ON A SMALL ONE...' : 'GOING ON A WALLED ONE...'),
+        opts.sub || null, 1.5);
       audio.tone(58, 0.8, { type: 'triangle', vol: 0.07, slide: 20 });
+    },
+
+    // Hand a right-of-way wave to the rider who had priority — he rides it clean while
+    // you watch, then the run rolls on. Used both when you never went and when you
+    // pulled back off the drop (see updateRide).
+    yieldWave(msg, sub) {
+      this.startNpc({
+        make: true,
+        idx: this.snake ? this.snake.idx : undefined,
+        A: Math.min(96, this.wv.A * 0.72),
+        peak: this.wv.peak,
+        msg, sub,
+        after: () => this.recordAndAdvance('good'),
+      });
     },
     updateNpc(dt) {
       this.nT += dt;
@@ -615,7 +694,13 @@ export function makeScenes(game) {
         }
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
-      if (this.nT >= ph.END) this.mode = 'watch';           // your wave builds as normal
+      if (this.nT >= ph.END) {
+        // an interstitial beat hands you back your own wave; a yielded right-of-way wave
+        // was the wave, so it runs its own follow-up instead (see yieldWave)
+        const after = this.nAfter;
+        this.nAfter = null;
+        if (after) after(); else this.mode = 'watch';
+      }
     },
 
     startRide(late, tier) {
@@ -662,12 +747,18 @@ export function makeScenes(game) {
     //      the lip, gets thrown over the falls (slow-mo), the wave lands (screen shake)
     //      and buries him, then WIPEOUT. Phase timings below. (monster waves only)
     pitchPhase() { return { HANG: 1.0, DROP: 2.0, TOSS: 4.4, END: 5.6 }; },
-    startPitch() {
+    //      Doubles as the snaking punishment: pass snaked=true and the rider who had the
+    //      right of way comes screaming past on the inside while the lip takes you.
+    startPitch(snaked = false) {
       this.mode = 'pitch';
       this.pT = 0;
       this.pDur = this.pitchPhase().END;
       this.lipX = this.peakX();
-      this.takeX = Math.min(206, this.sweetX());          // where he committed / drops in
+      // snaked: it's a normal makeable wave and you took off where you stood
+      this.pSnake = snaked
+        ? { type: this.riders[this.snake.idx].type || 'boarder' }
+        : null;
+      this.takeX = Math.min(206, snaked ? this.px : this.sweetX());   // where he committed / drops in
       this.pSpin = (Math.random() < 0.5 ? -1 : 1);
       this.pSmashed = false;
       this.pThrown = false;
@@ -691,8 +782,11 @@ export function makeScenes(game) {
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
       if (this.pT >= this.pDur) {
-        if (this.isBomb) { this.startReplayPrompt(() => game.goto('wipeout', { reason: 'OVER THE FALLS!', detail: 'TOO BIG — YOU GOT PITCHED' })); return; }
-        game.goto('wipeout', { reason: 'OVER THE FALLS!', detail: 'TOO BIG — YOU GOT PITCHED' });
+        const out = this.pSnake
+          ? { reason: 'DROPPED IN!', detail: 'DON\'T SNAKE WAVES, KOOK' }
+          : { reason: 'OVER THE FALLS!', detail: 'TOO BIG — YOU GOT PITCHED' };
+        if (this.isBomb) { this.startReplayPrompt(() => game.goto('wipeout', out)); return; }
+        game.goto('wipeout', out);
       }
     },
 
@@ -746,6 +840,21 @@ export function makeScenes(game) {
         }
       }
 
+      // the rider who had the right of way, screaming past on the inside while you get
+      // thrown — he was always going to make it; the wave was his
+      if (this.pSnake) {
+        const u = Math.min(1, this.pT / ph.TOSS);
+        const sx = (this.takeX - 62) + u * 172;
+        const sy = crestY + 30 + u * (SURFACE - 16 - (crestY + 30));
+        if (sx < W + 20) {
+          if (!drawRiderImg(ctx, localKey(this.pSnake.type, 'ride'), sx, sy, -0.1)) {
+            drawMap(ctx, MAPS.trim, sx - 16, sy - 6, 2, true);
+          }
+          ctx.fillStyle = 'rgba(255,255,255,0.8)';   // his spray trail down the line
+          for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(sx - 10 - i * 6), Math.round(sy + 7 + (i % 2) * 2), 3, 2);
+        }
+      }
+
       // ---- the rider, per phase (bigger/closer than a normal ride so the toss reads) ----
       let rx, ry, rot, key, scale;
       if (this.pT < ph.HANG) {
@@ -755,7 +864,10 @@ export function makeScenes(game) {
         rot = 0.12 + (this.pT / ph.HANG) * 0.12;
         key = riderKey('drop');
         scale = 1.3;
-        if (Math.floor(this.pT * 5) % 2) text(ctx, 'HANG ON!', W / 2, 30, 11, '#f8f890', 'center');
+        if (Math.floor(this.pT * 5) % 2) {
+          if (this.pSnake) text(ctx, 'DON\'T SNAKE WAVES, KOOK', W / 2, 30, 10, '#f85838', 'center');
+          else text(ctx, 'HANG ON!', W / 2, 30, 11, '#f8f890', 'center');
+        }
       } else if (this.pT < ph.DROP) {
         // DROP: he goes for it — dropping down the huge face, accelerating, nose-down
         const dp = (this.pT - ph.HANG) / (ph.DROP - ph.HANG);
@@ -846,8 +958,8 @@ export function makeScenes(game) {
     trickZone() {
       const rel = (this.py - this.pocketY()) / (this.band || 15);
       if (Math.abs(rel) > 1.15) return null;     // outside the pocket — fix that first
-      // the bodysurfer never leaves the water, so his top zone gives the prone 360 too
-      if (rel < -0.34) return game.rider === 'surfer' ? 'spin' : 'air';
+      // up by the lip: the boarder goes over it, the bodysurfer goes under it
+      if (rel < -0.34) return game.rider === 'surfer' ? 'tube' : 'air';
       if (rel > 0.34) return 'stance';
       return 'spin';
     },
@@ -856,11 +968,16 @@ export function makeScenes(game) {
     startTrick(kind) {
       this.trickKind = kind;
       this.trickT = 0;
-      // the air keeps its snap; everything else draws out (TRICK_SLOW)
-      this.trickDur = kind === 'air' ? 0.95 : kind === 'spin' ? 0.6 * TRICK_SLOW : 0;   // stance runs while held
+      // the air keeps its snap; everything else draws out (TRICK_SLOW). The bodysurfer's
+      // roll turns his whole body over rather than pivoting flat, so it's slower again.
+      const spinBase = game.rider === 'surfer' ? 0.75 : 0.6;
+      this.trickDur = kind === 'air' ? 0.95
+        : kind === 'tube' ? 1.05
+        : kind === 'spin' ? spinBase * TRICK_SLOW : 0;   // stance runs while held
       this.airFrom = this.py;
       this.stanceScore = 0;
       if (kind === 'air') audio.tone(300, 0.45, { type: 'square', slide: 430, vol: 0.09 });
+      else if (kind === 'tube') audio.tone(150, 0.7, { type: 'triangle', slide: -60, vol: 0.09 });
       else if (kind === 'spin') audio.tone(520, 0.4, { type: 'square', slide: 320, vol: 0.08 });
       else audio.tone(170, 0.3, { type: 'triangle', slide: 70, vol: 0.07 });
     },
@@ -887,6 +1004,30 @@ export function makeScenes(game) {
             this.chain = 0;
             this.buried = Math.max(this.buried, 0.3);
             this.say('BLOWN LANDING', 'GET BACK IN THE POCKET', 1.2);
+            audio.noise(0.35, { vol: 0.11 });
+          }
+          this.trickKind = null; this.trickCd = 0.35;
+        }
+        return true;
+      }
+      if (k === 'tube') {
+        // the bodysurfer's answer to the air: instead of going OVER the lip he pulls up
+        // under it, disappears behind the curtain, and gets spat out down the line. Same
+        // bargain as the air — you're safe from the bury while you're in there, but the
+        // channel keeps wandering and you have to come out somewhere.
+        this.trickT += dt;
+        const u = Math.min(1, this.trickT / this.trickDur);
+        this.py = this.airFrom - Math.sin(u * Math.PI) * this.airH * 0.55;
+        if (u >= 1) {
+          const off = Math.abs(this.py - this.pocketY());
+          if (off <= this.band) {
+            this.awardTrick(900, this.trickName('tube'));
+            audio.splash();
+            audio.tone(420, 0.35, { type: 'square', slide: 380, vol: 0.09 });   // the spit
+          } else {
+            this.chain = 0;
+            this.buried = Math.max(this.buried, 0.3);
+            this.say('ATE IT IN THERE', 'GET BACK IN THE POCKET', 1.2);
             audio.noise(0.35, { vol: 0.11 });
           }
           this.trickKind = null; this.trickCd = 0.35;
@@ -920,8 +1061,24 @@ export function makeScenes(game) {
       return false;
     },
 
+    // You pulled back off a wave that wasn't yours. Etiquette bonus, streak untouched,
+    // and the rider who had priority gets to ride it out (see yieldWave).
+    pullBack() {
+      this.snake.yielded = true;
+      game.score += 250;
+      this.floaters.push({ txt: '+250', x: this.pocketX(), y: this.py - 18, t: 1.6 });
+      audio.select();
+      this.yieldWave('PULLED BACK', 'GOOD ETIQUETTE  +250');
+    },
+
     updateRide(dt) {
       if (this.dropT > 0) {
+        // Right-of-way: he's deeper and already going. The whole drop is your window to
+        // pull back off it — except the last beat, by which point you're committed and
+        // it's his shoulder you're standing on.
+        if (this.snake && !this.snake.yielded) {
+          if (this.dropT > 0.6 && input.pressed('a')) { this.pullBack(); return; }
+        }
         // the drop: accelerating fall from the lip into the pocket, no bury risk yet
         this.dropT -= dt;
         this.foamX += this.peel * dt * 0.3;
@@ -930,6 +1087,8 @@ export function makeScenes(game) {
         this.py = this.dropY0 + (this.pocketY() - this.dropY0) * k * k * k
           + Math.sin(this.animT * 26) * (1 - k) * 1.5;  // teetering wobble while hanging
         if (this.dropT <= 0) {
+          // you rode it anyway — he zooms past on the inside and the lip takes you
+          if (this.snake && !this.snake.yielded) { this.startPitch(true); return; }
           audio.splash();
           this.say('HOLD THE POCKET', input.usedTouch ? 'SLIDE ↑↓ ANYWHERE — STAY BETWEEN THE LINES' : '↑↓ STAY BETWEEN THE LINES', 2.6);
         }
@@ -941,7 +1100,7 @@ export function makeScenes(game) {
       // A drawn-out trick costs you ground: the break eats forward while you're busy and
       // falls back once you're trimming again. Visual pressure only — capped well short
       // of the rider, so the whitewater still never overtakes him.
-      const dragging = this.trickKind && this.trickKind !== 'air';
+      const dragging = this.trickKind && this.trickKind !== 'air' && this.trickKind !== 'tube';
       this.foamCreep = Math.max(0, Math.min(9,
         this.foamCreep + (dragging ? 16 : -11) * dt));
 
@@ -1324,11 +1483,24 @@ export function makeScenes(game) {
       // once the wave stands up (~60% built) the whole lineup drops prone and paddles
       // for it — the go/no-go window. Committing keeps you paddling.
       const paddling = this.committed || q > 0.55;
-      // the other riders in the lineup — the swell lifts them as it rolls through
-      for (const r of this.riders) {
-        const ry = LINEUP_Y + Math.sin(this.animT * 2 + r.ph) * 2 - this.waveH(r.x, q) * 0.25 * q * q;
-        if (!drawRiderImg(ctx, localKey(r.type, paddling ? 'paddle' : 'sit'), r.x, ry - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, r.x - 16, ry - 6, 2, true);
-      }
+      // the other riders in the lineup — the swell lifts them as it rolls through. On a
+      // right-of-way wave one of them has already swung deep and is stroking for it
+      // (updateWatch moves snake.x); he goes prone before the rest of the pack does.
+      const deepIdx = this.snake ? this.snake.idx : -1;
+      const drawLocal = (i) => {
+        const r = this.riders[i];
+        const deep = i === deepIdx;
+        const rx = deep ? this.snake.x : r.x;
+        const ry = LINEUP_Y + Math.sin(this.animT * 2 + r.ph) * 2 - this.waveH(rx, q) * 0.25 * q * q;
+        const stroking = paddling || (deep && q > 0.42);
+        if (!drawRiderImg(ctx, localKey(r.type, stroking ? 'paddle' : 'sit'), rx, ry - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, rx - 16, ry - 6, 2, true);
+        if (deep && q > 0.42 && Math.floor(this.animT * 4) % 2) {
+          // kept clear of the frame edges — he sits deep, and the label must not clip
+          text(ctx, 'HIS WAVE', Math.max(32, Math.min(W - 32, rx)), ry - 22, 7, '#f85838', 'center');
+        }
+      };
+      for (let i = 0; i < this.riders.length; i++) if (i !== deepIdx) drawLocal(i);
+      if (deepIdx >= 0) drawLocal(deepIdx);   // on top — he's the one you have to read
       // player — lifted too as the wave arrives under you. Sitting in the lineup;
       // drops to a paddle/swim stance once the wave stands up.
       const py = LINEUP_Y + Math.sin(this.animT * 2.6) * 2 - this.waveH(this.px, q) * 0.25 * q * q;
@@ -1619,8 +1791,8 @@ export function makeScenes(game) {
         ctx.fillRect(x, Math.round(c + bnd), 3, 1);
       }
       // solid brackets at the rider so "am I in it?" is never ambiguous — neutral while
-      // he's airborne, since being out of the band is the point of an air
-      ctx.fillStyle = this.trickKind === 'air' ? 'rgba(248,216,72,0.9)'
+      // he's off the face, since leaving the band is the point of an air / a tube pull-in
+      ctx.fillStyle = (this.trickKind === 'air' || this.trickKind === 'tube') ? 'rgba(248,216,72,0.9)'
         : Math.abs(this.py - pyT) <= bnd ? 'rgba(140,232,160,0.9)' : 'rgba(248,88,56,0.9)';
       ctx.fillRect(pkX - 10, Math.round(pyT - bnd), 24, 1);
       ctx.fillRect(pkX - 10, Math.round(pyT + bnd), 24, 1);
@@ -1644,22 +1816,74 @@ export function makeScenes(game) {
         for (let i = 1; i <= 6; i++) {
           ctx.fillRect(pkX - 6 + (i % 2) * 6, Math.round(this.py) - i * 9, 3, 5);
         }
+        // right-of-way: he's deeper (left of you) and already on his feet — you're on
+        // his shoulder. The whole drop is the window to pull back off it.
+        if (this.snake && !this.snake.yielded) {
+          const sx = pkX - 42 + dk * 12;
+          const sy = this.py + 10 + dk * 6;
+          if (!drawRiderImg(ctx, localKey(this.riders[this.snake.idx].type, 'drop'), sx, sy, 0.16)) {
+            drawMap(ctx, MAPS.paddleA, sx - 16, sy - 6, 2, true);
+          }
+          const tooLate = this.dropT <= 0.6;
+          if (Math.floor(this.animT * 6) % 2) {
+            text(ctx, tooLate ? 'YOU\'RE SNAKING HIM...' : 'HE HAS THE RIGHT OF WAY',
+              W / 2, 30, 9, tooLate ? '#f85838' : '#f8f890', 'center');
+          }
+          if (!tooLate) {
+            text(ctx, input.usedTouch ? 'TAP TO PULL BACK' : 'X TO PULL BACK', W / 2, 44, 9, '#48d048', 'center');
+          }
+        }
       } else if (this.trickKind === 'spin') {
-        // 360 flat on the face, PRONE for both riders — the ride frame is already prone
-        // (boarder on the deck, bodysurfer planing), so rotating it is the whole trick
+        // Both riders are prone through this, but they turn about different axes: the
+        // boarder pivots FLAT on the deck (a cartwheel seen from above), the bodysurfer
+        // ROLLS about his own long axis — the same move he finishes a ride with.
         const rot = Math.min(1, this.trickT / (this.trickDur || 0.75)) * Math.PI * 2;
         const key = trickArt('spin', riderKey('ride'));
-        if (!drawRiderImg(ctx, key, pkX, this.py, rot)) {
+        const rolling = game.rider === 'surfer';
+        const drawn = rolling
+          ? drawRollImg(ctx, key, pkX, this.py, rot)
+          : drawRiderImg(ctx, key, pkX, this.py, rot);
+        if (!drawn) {
           ctx.save();
           ctx.translate(pkX, Math.round(this.py));
-          ctx.rotate(rot);
+          if (rolling) ctx.scale(1, Math.cos(rot)); else ctx.rotate(rot);
           drawMap(ctx, spr().ride, -16, -5, 2, true);
           ctx.restore();
         }
-        ctx.fillStyle = 'rgba(255,255,255,0.7)';   // spray ring off the rail as he pivots
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';   // spray thrown off as he comes over
         for (let i = 0; i < 6; i++) {
           const a = rot + i * 1.05;
           ctx.fillRect(Math.round(pkX + Math.cos(a) * 16), Math.round(this.py + Math.sin(a) * 8), 2, 2);
+        }
+      } else if (this.trickKind === 'tube') {
+        // pulled up under the curtain: he slides up the face, the lip swallows him for
+        // the middle of the move, then he's spat out down the line on a jet of spray
+        const u = Math.min(1, this.trickT / (this.trickDur || 1.05));
+        const hidden = u > 0.28 && u < 0.72;
+        // the curtain thickens over him while he's in there
+        ctx.fillStyle = `rgba(248,248,240,${(0.3 + (hidden ? 0.35 : 0.1)).toFixed(2)})`;
+        for (let i = 0; i < 6; i++) {
+          ctx.fillRect(pkX - 14 + i * 6, SURFACE - w.A + 8 + ((i * 13) % 8), 3, Math.round(w.A * 0.75));
+        }
+        if (!hidden) {
+          const lean = (u < 0.28 ? -0.2 : 0.12);   // climbing in nose-up, coming out level
+          const key = trickArt('tube', riderKey('ride'));
+          if (!drawRiderImg(ctx, key, pkX + (u > 0.72 ? 8 : -4), this.py, lean)) {
+            ctx.save();
+            ctx.translate(pkX + (u > 0.72 ? 8 : -4), Math.round(this.py));
+            ctx.rotate(lean);
+            drawMap(ctx, spr().ride, -16, -5, 2, true);
+            ctx.restore();
+          }
+        }
+        if (u > 0.72) {
+          // the spit — a blast of mist firing out of the barrel behind him
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          const sp = (u - 0.72) / 0.28;
+          for (let i = 0; i < 10; i++) {
+            ctx.fillRect(Math.round(pkX - 24 - i * 5 + sp * 26),
+              Math.round(this.py - 6 + ((i * 11) % 16)), 3, 2);
+          }
         }
       } else if (this.trickKind === 'air') {
         // launched off the lip: airborne, rotating, growing as he leaves the face
@@ -1725,11 +1949,14 @@ export function makeScenes(game) {
       }
       if (this.trickKind) text(ctx, this.trickName(this.trickKind), W / 2, 40, 13, '#8ce8a0', 'center');
       if (this.chain > 0) text(ctx, `CHAIN ${this.chain} · x${this.chainMult().toFixed(2)}`, 6, 42, 7, '#8ce8a0');
-      if (this.rt < 3.2) {
+      // the steering/trick hints stay out of the way while the pull-back prompt is up —
+      // on a right-of-way wave X means "get off it", not "do a trick"
+      const pullingBack = this.dropT > 0 && this.snake && !this.snake.yielded;
+      if (this.rt < 3.2 && !pullingBack) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
-        // the bodysurfer has no air, so he gets the two-move version of the hint
+        // same three zones for both riders, different moves in the top one
         const hint = game.rider === 'surfer'
-          ? (input.usedTouch ? 'TAP=PRONE 360 · HOLD LOW=LAY-BACK' : 'X=PRONE 360 · HOLD X LOW=LAY-BACK')
+          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK' : 'X — HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK')
           : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW=DRAG' : 'X — HIGH=AIR · MID=SPIN · HOLD LOW=DRAG');
         text(ctx, hint, W / 2, 225, 7, '#8ce8a0', 'center');
       } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
@@ -1780,19 +2007,9 @@ export function makeScenes(game) {
       // rider + finishing trick (rotated around the rider)
       const rolling = game.rider === 'surfer' && this.exT > 0.9;
       if (rolling) {
-        // lengthwise barrel roll: prone bodysurfer rotating about his long axis, faked
-        // by flipping/squashing vertically — full at top/underside, thin edge-on at the sides
+        // lengthwise barrel roll — the kick-out version of his in-ride 360 (drawRollImg)
         const roll = this.exRoll || 0;
-        const img = IMG['sp_s_prone'];
-        if (img && img.complete && img.naturalWidth > 0) {
-          const w = img.naturalWidth, h = img.naturalHeight;
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          ctx.translate(Math.round(this.exX), Math.round(this.exY));
-          ctx.scale(1, Math.cos(roll));            // + top, 0 edge-on, − underside
-          ctx.drawImage(img, Math.round(-w / 2), Math.round(-h / 2));
-          ctx.restore();
-        } else {
+        if (!drawRollImg(ctx, trickArt('spin', 'sp_s_prone'), this.exX, this.exY, roll)) {
           ctx.save();
           ctx.translate(this.exX, this.exY);
           ctx.rotate(roll);

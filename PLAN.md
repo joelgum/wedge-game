@@ -42,6 +42,15 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 - **Outcomes by how close you were to the sweet spot:** IN THE SLOT (max bonus) · CLEAN DROP · LATE DROP (ride starts with a short chaotic window) · PITCHED (wipeout, life lost, over-the-falls tumble).
 - **Not committing:** a makeable wave you let pass = WAVE WASTED (no life lost); a closeout you correctly skip = GOOD CALL (small bonus). Committing to a closeout = CLOSED OUT (wipeout).
 
+### Right of way — don't snake (2026-07-26, Joel's call)
+About **1 in 5** makeable waves is somebody else's. One of the locals swings deep and starts stroking for it once the wave is ~40% built — he ends up **left of you**, nearer the peak, labelled **HIS WAVE** — and surf etiquette gives the wave to whoever's deepest.
+
+- **Let it go** → GOOD CALL +150, streak intact; he rides it out while you watch.
+- **Take off anyway** → no drop bonus (it was never your wave), and the whole 2.8s drop is your window to bail: **X / tap = PULL BACK** → +250, streak intact, he gets the wave. The prompt is up the entire drop except the last 0.6s, after which you're committed and the trick hints stay suppressed so X never means two things at once.
+- **Ride it** → he zooms past on the inside, the lip takes you, and you're pitched: **DROPPED IN! / DON'T SNAKE WAVES, KOOK.** Costs a life like any other wipeout.
+
+Never rolls on a closeout, a monster, or the first two teaching waves, and it takes over the interstitial NPC slot for that wave. The local who's going rides as **his own type** — sponger or bodysurfer, whichever he rolled at the start of the run. Implemented as `surf.snake` (per-wave) + `yieldWave()`, which hands the wave to the existing NPC beat with an `after` callback.
+
 ### Ride — the drop + the tube
 - A long, heavy **drop** down the face — deliberate hang-time so it reads as a big, heavy wave — then **hold the line**: keep the rider in the pocket band with ↑↓ (or vertical drag) as the wave tries to bury you.
 - The pocket band is **the wave surging under you**: a smooth, non-repeating wander (three sines with no common period + per-ride random phases), drawn the whole way down the line with look-ahead so it's readable, never a gotcha.
@@ -53,11 +62,13 @@ Where you sit in the pocket band when you press X / tap decides the trick. One b
 
 | Band zone | Bodyboarder | Bodysurfer | Notes |
 |---|---|---|---|
-| High (by the lip) | AIR — launch, one rotation, land back in the band | *(no air — folds into the prone 360)* | Landing outside the band = no score, chain reset, BURIED clock starts. The channel wanders while you're airborne — that's the risk. |
-| Middle | 360 SPIN, **prone** on the face | PRONE 360, body flat and planing | 0.75s, no steering, drift keeps running. |
+| High (by the lip) | AIR — launch, one rotation, land back in the band (0.95s, 900) | SPAT OUT — pull up under the curtain, vanish behind it, get spat out down the line (1.05s, 900) | You're safe from the bury while you're off the face, but the channel wanders and you have to come back to it. Out of the band on the way out = no score, chain reset, BURIED clock starts. |
+| Middle | 360 SPIN, **prone and flat** on the deck (0.75s, 300) | 360 ROLL, **prone**, over his own long axis (0.94s, 300) | No steering, drift keeps running. |
 | Low (trough), **held** | KNEE DROP + hand drag | LAY-BACK, arm spread | Scores per second while held and in the band; steering drops to half. |
 
-**The bodysurfer never leaves the water** (2026-07-26 revision, Joel's call): he has no air, so his top-of-band tap gives the prone 360 as well. Both riders' 360s are **prone** — the arms-out `spr_s_spin.png` is the pitched-wipeout ragdoll and is not a trick frame. That split leaves the boarder as the trick scorer and the bodysurfer as the tube/exit scorer, which is what `RIDER_STATS` already encodes (tube 1.4×, exit 1.25×).
+**The bodysurfer never leaves the water** (2026-07-26, Joel's call). He has no air — so where the boarder goes *over* the lip he goes *under* it, and his top-of-band tap pulls him into the barrel. Same bargain (out of your hands for a beat, the channel keeps moving, same 900), different move, and both riders end up with three.
+
+**His 360 is a roll, not a cartwheel** (2026-07-26 revision, Joel's call): he turns about his own long axis with his arms up near his head for momentum — the same move he finishes a ride with — where the boarder pivots flat on the deck. Drawn by squashing the prone frame through `cos(roll)` (`drawRollImg`), which the kick-out sequence shares, so the two read as one move. It's also a touch slower than the boarder's spin (0.94s vs 0.75s). The arms-out `spr_s_spin.png` remains the pitched-wipeout ragdoll and is not a trick frame.
 
 **Every trick but the air runs 25% longer** (`TRICK_SLOW`), and that drawn-out time costs ground: the drawn break edge creeps up to 9px closer to the rider while a slow trick is running and eases back once he's trimming again. Pressure you can see — the rider holds his screen position and the whitewater still can never overtake him.
 
@@ -222,7 +233,7 @@ retro NES game HUD elements: pixel heart life icons x3, score counter in blocky 
 | 3 | **Ride + wipeout** | ✅ Heavy cubic-hang drop, hold-the-pocket tube, buried/closeout wipeouts, made-wave exit cinematic; full 3-life session playable |
 | 4 | **Rider select** | ✅ Bodyboarder / bodysurfer, wired through every player draw (placeholder sprites) |
 | 5 | **Mobile controls** | ✅ Relative-slide steering (finger-as-controller) + tap-to-go; no-cache dev server for iOS |
-| 6 | **Art pass** | 🟡 Backdrops + rider frames are in (Gemini). **Outstanding: the 4 trick poses** — prompts ready in [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) (`spr_b_spin`, `spr_b_air`, `spr_b_knee`, `spr_s_layback`); tricks play on transformed stand-ins until they land, and each slots in by uncommenting one `loadImg` line |
+| 6 | **Art pass** | 🟡 Backdrops + rider frames are in (Gemini). **Outstanding: the 6 trick poses** — prompts ready in [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) (`spr_b_spin`, `spr_b_air`, `spr_b_knee`, `spr_s_layback`, `spr_s_roll`, `spr_s_tube`); tricks play on transformed stand-ins until they land, and each slots in by uncommenting one `loadImg` line. The locals and the right-of-way rider need no new art — they reuse the existing frames |
 | 7 | **Audio pass** | 🟡 8-bit SFX + chiptune synth working in code; could refine/mix |
 | 8 | **Polish + ship** | 🟡 High scores, pause, mute persist and touch is usable; **remaining:** deploy to a live URL (Astro route or standalone Vercel) |
 
