@@ -1,9 +1,20 @@
 # WEDGE! — Trick Sprite Prompt Kit (Google AI Studio / Gemini)
 
 > Written 2026-07-26 for the Phase 5 trick system. **All six trick frames are generated
-> and live** as of 2026-07-27 (plus a re-rolled `spr_s_prone`). Keep this file as the
-> recipe for re-rolls and for the two frames still on the old bodysurfer — see
-> *Still to do* at the bottom.
+> and live** as of 2026-07-27 (plus a re-rolled `spr_s_prone`), so prompts 1–8 are here
+> as the recipe for re-rolls.
+>
+> **Everything still outstanding is in [§ NPC batch](#npc-batch--the-lineup-stops-being-clones) — eight prompts, and they are the whole list:**
+>
+> | | Prompt | Why it's outstanding |
+> |---|---|---|
+> | B1–B3 | `spr_b_sit_n1..n3` | the three NPC boarders' lineup frames — carry build and gender, which a recolour can't |
+> | S1–S3 | `spr_s_tread_n1..n3` | the three NPC bodysurfers', same |
+> | 9 | `spr_s_tread` | the player's own bodysurfer is still the *old* character here |
+> | 10 | `spr_s_drop` | and here |
+>
+> Nothing else in the game is missing art: every other `loadImg` resolves to a file in
+> `assets/`, and every file in `assets/` is used.
 
 ## How these get into the game
 
