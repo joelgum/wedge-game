@@ -33,7 +33,7 @@ function newDailyRand() { return mulberry32(hashStr(dailyKey())); }
 // Preloaded background art (Midjourney-derived, served from ./assets/ by serve.py).
 // Scenes draw these when loaded and fall back to procedural rendering until then.
 const IMG = {};
-function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=15'; IMG[key] = i; }
+function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=16'; IMG[key] = i; }
 function imgReady(key) { const i = IMG[key]; return i && i.complete && i.naturalWidth > 0; }
 loadImg('title', 'title.png');
 loadImg('select', 'select.png');
@@ -59,16 +59,16 @@ const RIDER_ART = {
   boarder: { sit: 'sp_b_sit', paddle: 'sp_b_paddle', drop: 'sp_b_drop', ride: 'sp_b_ride' },
   surfer: { sit: 'sp_s_tread', paddle: 'sp_s_prone', drop: 'sp_s_drop', ride: 'sp_s_prone' },
 };
-// Trick art (Phase 5). The moves already play using the frames above, transformed in
-// code; these are the dedicated poses. Generate them with the prompts in
-// SPRITE_PROMPTS.md, drop the PNG in assets/, uncomment its line — nothing else to do,
-// drawRide picks a trick frame up automatically the moment it loads (see trickArt).
-// loadImg('sp_b_spin', 'spr_b_spin.png');     // boarder — flat 360 on the face
-// loadImg('sp_b_air', 'spr_b_air.png');       // boarder — airborne, rail grab
-// loadImg('sp_b_knee', 'spr_b_knee.png');     // boarder — knee drop + hand drag
-// loadImg('sp_s_layback', 'spr_s_layback.png'); // bodysurfer — lay-back, arm spread
-// loadImg('sp_s_roll', 'spr_s_roll.png');       // bodysurfer — PRONE 360 ROLL, arms up by the head
-// loadImg('sp_s_tube', 'spr_s_tube.png');       // bodysurfer — coming out of the barrel
+// Trick art (Phase 5) — the dedicated poses, generated from the prompts in
+// SPRITE_PROMPTS.md and cut down to house scale by execution/pixelate_sprite.py.
+// drawRide picks these up automatically (see trickArt); comment a line back out and
+// the move falls back to its transformed stand-in frame.
+loadImg('sp_b_spin', 'spr_b_spin.png');       // boarder — flat 360 on the face
+loadImg('sp_b_air', 'spr_b_air.png');         // boarder — airborne, rail grab
+loadImg('sp_b_knee', 'spr_b_knee.png');       // boarder — knee drop + hand drag
+loadImg('sp_s_layback', 'spr_s_layback.png'); // bodysurfer — lay-back, arm spread
+loadImg('sp_s_roll', 'spr_s_roll.png');       // bodysurfer — PRONE 360 ROLL, arms up by the head
+loadImg('sp_s_tube', 'spr_s_tube.png');       // bodysurfer — coming out of the barrel
 const TRICK_ART = {
   boarder: { spin: 'sp_b_spin', air: 'sp_b_air', stance: 'sp_b_knee' },
   // no air for the bodysurfer — he stays on the water. His 360 is a PRONE ROLL about his

@@ -1,20 +1,32 @@
 # WEDGE! — Trick Sprite Prompt Kit (Google AI Studio / Gemini)
 
-> Written 2026-07-26 for the Phase 5 trick system. The tricks **already play** using the
-> existing frames transformed in code; these prompts produce the dedicated poses that
-> replace those stand-ins.
+> Written 2026-07-26 for the Phase 5 trick system. **All six trick frames are generated
+> and live** as of 2026-07-27 (plus a re-rolled `spr_s_prone`). Keep this file as the
+> recipe for re-rolls and for the two frames still on the old bodysurfer — see
+> *Still to do* at the bottom.
 
 ## How these get into the game
 
 1. Generate in **Google AI Studio** (Gemini image generation), one prompt per pose.
-2. Cut the figure out onto **transparency** (the existing rider PNGs are transparent —
-   AI Studio output usually needs a background knock-out; a flat magenta/white background
-   keys cleanly).
-3. Save into `assets/` with the **exact filename** listed on each prompt.
-4. In `src/scenes.js`, uncomment that sprite's `loadImg(...)` line in the `TRICK_ART`
-   block near the top. That's the whole integration — `drawRide` picks the frame up the
-   moment it loads, and falls back to the transformed stand-in if it's missing.
-5. Bump `?v=` on the `IMG` loader (`loadImg` in scenes.js) so phones don't serve a cached
+   Gemini returns a 1024×1024 JPG: real pixel art, but drawn as an 80×80 logical image
+   blown up to 12.8 px blocks on a solid magenta field. Keep the JPG — it goes in
+   `art-src/`, not `assets/`.
+2. Convert it with **`execution/pixelate_sprite.py`**, which finds the block grid,
+   samples one true pixel per block, keys the magenta to transparency, and snaps the
+   JPEG noise back down to ~10 colours:
+
+   ```sh
+   python3 execution/pixelate_sprite.py --report art-src/spr_b_air.jpg
+   python3 execution/pixelate_sprite.py --scale 0.65 art-src/spr_b_air.jpg assets/spr_b_air.png
+   ```
+
+   `--scale 0.65` is the house factor: Gemini draws the figure about 1.5× bigger than the
+   existing riders, and 0.65 lands the trick frames at 34–46 px wide, next to
+   `spr_b_ride.png` at 36. Check `--report` first — if the grid confidence isn't ~1.00 the
+   render isn't clean faux-pixel art and is worth re-rolling rather than salvaging.
+3. In `src/scenes.js`, that sprite's `loadImg(...)` line above `TRICK_ART` is already
+   there — comment it back out to fall the move back to its transformed stand-in.
+4. Bump `?v=` on the `IMG` loader (`loadImg` in scenes.js) so phones don't serve a cached
    miss, and hard-reload.
 
 ## House style — must match the existing sprites
@@ -156,10 +168,13 @@ view facing RIGHT, centered on a plain solid magenta background for easy cutout 
 arms spread wide, airborne, multiple figures, grid, reference sheet, text, watermark
 ```
 
-### 7 — `spr_s_prone.png` (optional re-roll) · lead hand out front, planing
+### 7 — `spr_s_prone.png` · lead hand out front, planing — **re-rolled and installed**
 > The second half of the move you described — hand back out in FRONT, body planing down
-> the line. The game already has this frame (`spr_s_prone.png`) and uses it for both the
-> paddle and the ride. Only re-roll it if you want the lead hand more pronounced.
+> the line. Used for both the paddle and the ride. The re-roll shipped 2026-07-27: it
+> wasn't optional in the end, because the original frame is a *different character*
+> (pale, blue-and-green striped trunks) from the six trick poses, so the bodysurfer
+> visibly changed skin and trunks the instant a trick started. The original is kept at
+> `art-src/spr_s_prone_v1.png`.
 
 ```
 8-bit pixel art game sprite of a 1980s bodysurfer planing prone and flat down the line of a
@@ -185,6 +200,19 @@ already in `assets/` (`spr_b_*` / `spr_s_*`), picked by that local's own type. N
 generate for them.
 
 ---
+
+---
+
+## Still to do — the last two old bodysurfer frames
+
+`spr_s_tread.png` (bobbing in the lineup) and `spr_s_drop.png` (dropping in) are still the
+**original** bodysurfer: pale skin, blue/green striped trunks, no dark outline. Every other
+frame he appears in is now the dark-haired, teal-trunked character, so he still changes
+between the lineup and the ride. Two more generations fix it — reuse the style block above
+with *"dark hair, teal trunks"*, one treading water upright with just his head and
+shoulders clear, one stroking into the drop head-down on a steep face.
+
+The boarder needs nothing: his old frames already match the new set.
 
 ## Judging a generation before you cut it out
 

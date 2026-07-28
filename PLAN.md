@@ -141,7 +141,7 @@ Each survived wave advances the clock; palette + difficulty shift together:
 Midjourney is excellent for **key art, title screens, backgrounds, and mood/palette reference**, but weak at **spritesheets** — it can't produce consistent multi-frame animations of the same character, and its "pixel art" is faux-pixel (irregular grid, thousands of colors). Recommended pipeline:
 
 1. **Midjourney** → title screen, background layers, character *design reference*.
-2. **Downscale + palette-snap** the MJ output (e.g. in [Aseprite](https://www.aseprite.org/), ~$20, the industry pixel-art tool; free alternatives: [Piskel](https://www.piskelapp.com/), [Libresprite](https://libresprite.github.io/)) to true 8-bit grid + 16-color palette.
+2. **Downscale + palette-snap** the output to a true 8-bit grid + 16-color palette. `execution/pixelate_sprite.py` now does this without a GUI — it detects the faux-pixel block grid, samples one true pixel per block, keys the flat background to transparency and merges the JPEG noise back to ~10 colours. (Hand tools if you want to touch up: [Aseprite](https://www.aseprite.org/), ~$20; free: [Piskel](https://www.piskelapp.com/), [Libresprite](https://libresprite.github.io/).)
 3. **Hand-pixel the animation frames** in Aseprite/Piskel using the MJ design as reference (player is ~16×24 px — small enough that frames are quick).
 
 ### Master style suffix (append to every prompt for consistency)
@@ -251,7 +251,7 @@ retro NES game HUD elements: pixel heart life icons x3, score counter in blocky 
 | 3 | **Ride + wipeout** | ✅ Heavy cubic-hang drop, hold-the-pocket tube, buried/closeout wipeouts, made-wave exit cinematic; full 3-life session playable |
 | 4 | **Rider select** | ✅ Bodyboarder / bodysurfer, wired through every player draw (placeholder sprites) |
 | 5 | **Mobile controls** | ✅ Relative-slide steering (finger-as-controller) + tap-to-go; no-cache dev server for iOS |
-| 6 | **Art pass** | 🟡 Backdrops + rider frames are in (Gemini). **Outstanding: the 6 trick poses** — prompts ready in [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) (`spr_b_spin`, `spr_b_air`, `spr_b_knee`, `spr_s_layback`, `spr_s_roll`, `spr_s_tube`); tricks play on transformed stand-ins until they land, and each slots in by uncommenting one `loadImg` line. The locals and the right-of-way rider need no new art — they reuse the existing frames |
+| 6 | **Art pass** | 🟢 Backdrops, rider frames and all **6 dedicated trick poses** are in (Gemini → `execution/pixelate_sprite.py` → `assets/`), plus a re-rolled `spr_s_prone`. Sources kept in `art-src/`. The locals and the right-of-way rider need no new art — they reuse the existing frames. Remaining: `spr_s_tread` / `spr_s_drop` are still the *old* bodysurfer character, so he changes look between the lineup and the ride (see SPRITE_PROMPTS.md § Still to do) |
 | 7 | **Audio pass** | 🟡 8-bit SFX + chiptune synth working in code; could refine/mix |
 | 8 | **Polish + ship** | 🟡 High scores, pause, mute persist and touch is usable; **remaining:** deploy to a live URL (Astro route or standalone Vercel) |
 

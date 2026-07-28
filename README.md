@@ -50,6 +50,9 @@ A white box shows where the game thinks your finger is.
 | **Middle** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
 | **Low** (in the trough), **hold it** | KNEE DROP + hand drag | LAY-BACK, arm spread |
 
+Every one of the six has its own drawn frame (`assets/spr_*`, generated from
+[SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
+
 The bodysurfer never leaves the water: where the boarder goes over the lip, he goes under
 it. Same bargain either way — you're out of your own hands for a beat while the channel
 keeps wandering, and you have to come back to it.
