@@ -25,9 +25,18 @@ python3 -m http.server 8020
 |---|---|---|
 | ← → | track the shifting takeoff marker | — |
 | ↑ ↓ | — | steer to stay between the pocket lines |
-| X | commit to the wave | trick — the move depends on where you are in the band |
+| X | commit to the wave — **press again within 1.5s to pull back off it** | trick — the move depends on where you are in the band |
 | Enter | start / confirm | |
 | P / M | pause / music toggle (keyboard only) | |
+
+### Pull back — committing isn't final
+
+Press **X / tap a second time within 1.5 seconds** and you get off the wave: he climbs up
+the face, punches out over the back in a burst of spray, and is left treading water in the
+flat while the wave peels off without him. Works on **any** wave. It never costs a life and
+never touches your streak — bailing a closeout or a wave that's too big pays **+75** for the
+late read, bailing someone else's wave pays **+250**, and bailing a wave you could have made
+is simply WAVE WASTED. Whatever the drop paid you gets handed back, because you didn't ride it.
 
 Touch: your finger is the controller — drag anywhere and the rider follows it
 (horizontally in the lineup, vertically in the tube). Quick tap = commit/start/confirm.
@@ -59,9 +68,9 @@ stance, and drops off again once you're trimming. It still can't overtake you.
 
 - **Someone else's wave.** Roughly one in five makeable waves, a local swings deep and
   starts stroking for it — he ends up on your left, nearer the peak, labelled **HIS WAVE**.
-  He has the right of way. Let it go for +150, or take off and use the drop to bail out:
-  **X / tap = PULL BACK**, +250 and he gets the wave. Ride it anyway and he'll scream past
-  on the inside while the lip throws you over — *DON'T SNAKE WAVES, KOOK.*
+  He has the right of way. Let it go for +150, or take off and pull back out of it for
+  +250. Ride it anyway and he'll scream past on the inside while the lip throws you over —
+  *DON'T SNAKE WAVES, KOOK.*
 - **Feathering only near the peak** = makeable. A blinking ▼ marker appears on the
   shoulder — get under it and commit (X). Closer to dead-center = bigger drop bonus.
 - **Feathering across the whole crest** = closeout. Don't go — letting it pass pays +150.

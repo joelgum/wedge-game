@@ -42,11 +42,29 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 - **Outcomes by how close you were to the sweet spot:** IN THE SLOT (max bonus) · CLEAN DROP · LATE DROP (ride starts with a short chaotic window) · PITCHED (wipeout, life lost, over-the-falls tumble).
 - **Not committing:** a makeable wave you let pass = WAVE WASTED (no life lost); a closeout you correctly skip = GOOD CALL (small bonus). Committing to a closeout = CLOSED OUT (wipeout).
 
+### Pull back — committing isn't final (2026-07-27, Joel's call)
+Press X / tap **a second time within 1.5s** of committing and you get off the wave. Works on **every wave in the game** — closeouts, monsters, right-of-way waves, and ones you simply had second thoughts about.
+
+**What it looks like:** he rides UP the face and out over the back — climbs to the crest, punches through it in a burst of spray, then rides the back down as the wave sinks away beneath him and finishes treading water in the flat while it peels off toward the beach without him. Same beat (`PULL_BEAT` = 1.9s) whether you bailed from the lineup or from halfway down the drop; from the lip he's already above the crest, so it reads as settling onto the back of it rather than climbing.
+
+**What it's worth**, decided by the wave you got off:
+
+| Wave you bailed on | Result |
+|---|---|
+| Right of way (someone else's) | +250 · GOOD ETIQUETTE — then he rides it (see below) |
+| Closeout / trap monster | +75 · SAVED IT — half of the +150 for never going at all, so a clean read still pays best |
+| A wave you could have made | WAVE WASTED — no points, no life |
+| The session's makeable BOMB | WAVE WASTED · *"THAT BOMB WAS MAKEABLE…"* — no save bonus for bailing on the one that was on |
+
+It **never costs a life and never touches the streak.** Committing fast-forwards the wave 6×, so it lands 0.2–1.3s after you press — the window always runs out of the lineup and on into the drop, and both phases show the prompt with a draining bar.
+
+Two things the window forces (`fatalRead()` / `pendingAward`): a run-ending outcome may **not** land while you can still get off the wave, so a committed closeout or a badly-placed takeoff *hangs on you* until the last of the window expires, then resolves; and the drop bonus (or the bomb's +2000) is **given back** on a bail, because you didn't ride it. A late drop's broken streak is restored too.
+
 ### Right of way — don't snake (2026-07-26, Joel's call)
 About **1 in 5** makeable waves is somebody else's. One of the locals swings deep and starts stroking for it once the wave is ~40% built — he ends up **left of you**, nearer the peak, labelled **HIS WAVE** — and surf etiquette gives the wave to whoever's deepest.
 
 - **Let it go** → GOOD CALL +150, streak intact; he rides it out while you watch.
-- **Take off anyway** → no drop bonus (it was never your wave), and the whole 2.8s drop is your window to bail: **X / tap = PULL BACK** → +250, streak intact, he gets the wave. The prompt is up the entire drop except the last 0.6s, after which you're committed and the trick hints stay suppressed so X never means two things at once.
+- **Take off anyway** → no drop bonus (it was never your wave), and the standard 1.5s pull-back window is your way out: **X / tap again = PULL BACK** → +250, streak intact, he gets the wave. The trick hints stay suppressed while the prompt is up, so X never means two things at once.
 - **Ride it** → he zooms past on the inside, the lip takes you, and you're pitched: **DROPPED IN! / DON'T SNAKE WAVES, KOOK.** Costs a life like any other wipeout.
 
 Never rolls on a closeout, a monster, or the first two teaching waves, and it takes over the interstitial NPC slot for that wave. The local who's going rides as **his own type** — sponger or bodysurfer, whichever he rolled at the start of the run. Implemented as `surf.snake` (per-wave) + `yieldWave()`, which hands the wave to the existing NPC beat with an `after` callback.

@@ -98,6 +98,11 @@ const TRICKS = {
 // Every trick but the air runs 25% longer than it used to — the move draws out, and the
 // break eats that time back in ground (see foamCreep in updateRide).
 const TRICK_SLOW = 1.25;
+// Committing isn't quite final: press again inside this many seconds and you pull back
+// off the wave. Works on every wave — snakes, closeouts, bombs, and ones you simply had
+// second thoughts about (see startPullback).
+const PULL_WIN = 1.5;
+const PULL_BEAT = 1.9;   // length of the over-the-back cinematic
 
 // Draw a rider-art frame centered at (cx, cy) with optional rotation, crisp (no smoothing).
 // Returns false if the image isn't loaded yet so callers can fall back to procedural sprites.
@@ -420,6 +425,8 @@ export function makeScenes(game) {
         : null;
       if (this.snake) this.snake.x = this.riders[this.snake.idx].x;
       this.committed = false;
+      this.pullT = 0;           // seconds left to change your mind (see startPullback)
+      this.pendingAward = 0;    // points banked on this wave that a pull back gives back
       this.rumbled = false;
       this.holdT = 0;   // brief peak-drift freeze while a teaching callout is up (Phase 1)
       this.moveT = 0;           // >0 while repositioning, so the rider shows prone (not sitting)
@@ -479,6 +486,7 @@ export function makeScenes(game) {
       else if (m === 'npc') this.updateNpc(dt);
       else if (m === 'ride') this.updateRide(dt);
       else if (m === 'exit') this.updateExit(dt);
+      else if (m === 'pullback') this.updatePullback(dt);
       else this.updatePitch(dt);
       // record the bomb's drop+ride frame-by-frame (only while still in that phase, so the
       // completing frame that flips to exit/wipeout isn't captured) — see startReplayPrompt
@@ -487,6 +495,13 @@ export function makeScenes(game) {
 
     updateWatch(dt) {
       const w = this.wv;
+      // Second press within PULL_WIN of committing = pull back off it. Committing
+      // fast-forwards the wave 6×, so it lands 0.2–1.3s after you press — the window
+      // always runs out of the lineup and into the drop, and updateRide ticks the rest.
+      if (this.committed && this.pullT > 0) {
+        this.pullT -= dt;
+        if (input.pressed('a')) { this.startPullback(); return; }
+      }
       // committing breaks the wave NOW: the build fast-forwards, the peak stops
       // wandering, and your grade was sealed the instant you pressed
       w.t += this.committed ? dt * 6 : dt;
@@ -554,6 +569,8 @@ export function makeScenes(game) {
         if (input.pressed('a') && this.q() > 0.25) {
           this.committed = true;
           this.commitD = Math.abs(this.px - this.sweetX());
+          this.pullT = PULL_WIN;   // …but you have a beat and a half to think better of it
+          this.streakAtCommit = game.streak;   // a bail must leave the combo exactly as it was
           audio.select();
         }
       }
@@ -563,6 +580,10 @@ export function makeScenes(game) {
       const tol = Math.max(9, 16 - game.stage * 2);
       const d = this.committed ? this.commitD : 0;
       const mult = streakMult();
+      // Nothing that ends your run may land while you can still get off the wave. A
+      // makeable read starts the drop as normal and updateRide ticks the rest of the
+      // window; a fatal one hangs the wave on you until the last of it runs out.
+      if (this.committed && this.pullT > 0 && this.fatalRead(d, tol)) return;
       if (!this.committed) {
         // letting waves go never touches the streak (GOOD CALL / WAVE WASTED)
         if (this.snake) { game.score += 150; audio.select(); this.yieldWave('GOOD CALL', 'HIS WAVE — YOU LET HIM HAVE IT  +150'); }
@@ -599,9 +620,20 @@ export function makeScenes(game) {
       }
     },
 
+    // Would riding this one, from where you committed, end the run outright? Used to hold
+    // the fatal outcomes back while the pull-back window is still open.
+    fatalRead(d, tol) {
+      const w = this.wv;
+      if (this.snake) return false;                    // snaking plays out through the drop
+      if (w.monster) return !(w.rideable && d <= tol); // trap monster / off-slot bomb
+      if (!w.makeable) return true;                    // committed to a closeout
+      return d > tol * 1.9;                            // too far off the peak — pitched
+    },
+
     // Phase 4 — ride the bomb: flat +2000, a bigger, gnarlier pocket, doubled exit bonus.
     rideBomb() {
       game.score += 2000;
+      this.pendingAward += 2000;
       this.say('BOMB! +2000', 'RIDE OF THE DAY', 2.4);
       this.floaters.push({ txt: '+2000', x: this.px, y: 116, t: 1.8 });
       this.startRide(false, 'slot');
@@ -618,6 +650,7 @@ export function makeScenes(game) {
     awardDrop(base, mult, label, sub = 'DROPPING IN...') {
       const b = Math.round(base * mult);
       game.score += b;
+      this.pendingAward += b;
       const tag = mult > 1 ? ` x${multFmt(mult)}` : '';
       this.say(`${label} +${b}${tag}`, sub, 1.8);
       this.floaters.push({ txt: `+${b}${tag}`, x: this.px, y: 116, t: 1.4 });
@@ -1061,23 +1094,146 @@ export function makeScenes(game) {
       return false;
     },
 
-    // You pulled back off a wave that wasn't yours. Etiquette bonus, streak untouched,
-    // and the rider who had priority gets to ride it out (see yieldWave).
-    pullBack() {
-      this.snake.yielded = true;
-      game.score += 250;
-      this.floaters.push({ txt: '+250', x: this.pocketX(), y: this.py - 18, t: 1.6 });
+    // ---- PULL BACK: you pressed again inside PULL_WIN and got off the wave. He rides UP
+    //      the face and out over the back, and is left floating in the flat as it peels
+    //      away without him. What it's worth depends on the wave you got off — the streak
+    //      is never touched, and it never costs a life.
+    startPullback() {
+      const w = this.wv;
+      const fromDrop = this.mode === 'ride';
+      this.mode = 'pullback';
+      this.pbT = 0;
+      this.pbX = fromDrop ? this.pocketX() : this.px;
+      this.pbY0 = fromDrop ? this.py : LINEUP_Y;
+      this.pullT = 0;
+      this.floaters = [];
+      this.pbSplashed = false;
+      // You didn't ride it, so you don't keep what riding it paid: the drop bonus (and
+      // the bomb's +2000) go back, and the combo returns to exactly where it stood when
+      // you pressed. A late drop had already zeroed the streak — that's undone too.
+      game.score -= this.pendingAward || 0;
+      this.pendingAward = 0;
+      if (this.streakAtCommit !== undefined) game.streak = this.streakAtCommit;
+      this.isBomb = false; this.bombRide = false;
+      this.recording = false; this.recBuf = null;
+      if (this.snake) {
+        // his wave, and you gave it back to him — then he rides it out (see yieldWave)
+        this.snake.yielded = true;
+        game.score += 250;
+        this.pbSub = 'GOOD ETIQUETTE  +250';
+        this.pbAfter = () => this.yieldWave('HIS WAVE', 'HE HAD THE RIGHT OF WAY');
+      } else if (w.monster && w.rideable) {
+        // the session's one makeable bomb, and it was ON — no "saved it" bonus for that
+        this.pbSub = 'THAT BOMB WAS MAKEABLE...';
+        this.pbAfter = () => this.recordAndAdvance('waste');
+      } else if (!w.makeable || w.monster) {
+        // a late read still counts — half of what never going at all would have paid
+        game.score += 75;
+        this.pbSub = (w.monster ? 'TOO BIG' : 'CLOSEOUT') + ' — SAVED IT  +75';
+        this.pbAfter = () => this.recordAndAdvance('good');
+      } else {
+        this.pbSub = 'WAVE WASTED — THAT WAS THE ONE';
+        this.pbAfter = () => this.recordAndAdvance('waste');
+      }
+      // clears before the beat ends, so the last half-second shows him alone in the flat
+      this.say('PULLED BACK', this.pbSub, 1.5);
       audio.select();
-      this.yieldWave('PULLED BACK', 'GOOD ETIQUETTE  +250');
+      audio.tone(190, 0.4, { type: 'triangle', slide: 130, vol: 0.07 });
+    },
+
+    // The bail-out prompt and its draining window. Same in the lineup and on the drop, so
+    // the move never looks like two different things.
+    drawPullPrompt(ctx, y) {
+      if (!(this.pullT > 0)) return;
+      const u = Math.max(0, Math.min(1, this.pullT / PULL_WIN));
+      text(ctx, input.usedTouch ? 'TAP AGAIN TO PULL BACK' : 'X AGAIN TO PULL BACK', W / 2, y, 8, '#48d048', 'center');
+      ctx.fillStyle = '#181828'; ctx.fillRect(W / 2 - 24, y + 10, 48, 3);
+      ctx.fillStyle = u > 0.35 ? '#48d048' : '#f8d848';
+      ctx.fillRect(W / 2 - 24, y + 10, Math.round(u * 48), 3);
+    },
+
+    updatePullback(dt) {
+      this.pbT += dt;
+      if (!this.pbSplashed && this.pbT > PULL_BEAT * 0.42) {   // punching out through the crest
+        this.pbSplashed = true;
+        audio.splash();
+      }
+      if (this.pbT >= PULL_BEAT) {
+        const after = this.pbAfter;
+        this.pbAfter = null; this.pbSplashed = false;
+        if (after) after();
+      }
+    },
+
+    // The wave rolls on through and shrinks away toward the beach while he climbs the
+    // face, punches over the crest, and settles in the flat behind it.
+    drawPullback(ctx, p) {
+      const w = this.wv;
+      const u = Math.min(1, this.pbT / PULL_BEAT);
+      const fade = Math.max(0, (u - 0.4) / 0.6);            // it leaves without him
+      const scale = 1 - fade * 0.9;
+      const baseY = SURFACE + fade * 34;                    // …and rolls on in toward the beach
+      const peak = this.peakX();
+      const crestOf = (x) => baseY - this.waveH(x, 1) * scale;
+      const fg = faceGradient(ctx, crestOf(peak), baseY, p);
+      for (let x = 0; x < W; x += 2) {
+        const h = this.waveH(x, 1) * scale;
+        if (h < 2) continue;
+        const top = baseY - h;
+        ctx.fillStyle = fg;
+        ctx.fillRect(x, Math.round(top), 2, Math.round(h) + 2);   // sits on the backdrop's sea
+        if (x > peak) {
+          ctx.fillStyle = 'rgba(180,224,248,0.16)';
+          ctx.fillRect(x, Math.round(top + h * 0.45), 2, Math.round(h * 0.55));
+        }
+        // it breaks on down the line without you — whitewater marching right along the crest
+        if (h > 8 && (x + Math.floor(this.pbT * 40)) % 6 < 3) {
+          ctx.fillStyle = p.foam;
+          ctx.fillRect(x, Math.round(top) - 2, 2, 4 + Math.round(fade * 6));
+        }
+      }
+      // flat water behind the wave — where he ends up
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      for (let i = 0; i < 8; i++) {
+        const sx = ((((i * 33 + this.pbT * 40) % (W + 30)) + W + 30) % (W + 30)) - 15;
+        ctx.fillRect(Math.round(sx), 112 + (i % 3) * 5, 9, 1);
+      }
+      // ---- him, going over the back ----
+      // up the face to just clear of the crest by u≈0.42, then he rides the back down as
+      // the wave shrinks away under him and sits up in the flat.
+      // He goes to the crest where he is, then rides the back down as the wave sinks away
+      // beneath him and finishes in the flat. From the lineup that's a climb; from the
+      // lip (where he was already above the crest) it's him settling onto the back of it.
+      const climb = Math.min(1, u / 0.42);
+      const crestNow = Math.min(crestOf(this.pbX), 150) + 3;
+      const rx = this.pbX - 6 - u * 12;                       // he drifts back, not with it
+      const ry = this.pbY0 + (crestNow - this.pbY0) * (climb * climb * (3 - 2 * climb));
+      const over = u > 0.42;
+      const rot = over ? 0.30 * Math.max(0, 1 - (u - 0.42) / 0.3) : -0.44 * climb;
+      const key = riderKey(over ? 'sit' : 'paddle');
+      if (!drawRiderImg(ctx, key, rx, ry, rot, 0, 1)) {
+        ctx.save();
+        ctx.translate(rx, Math.round(ry)); ctx.rotate(rot);
+        drawMap(ctx, over ? spr().paddleA : spr().ride, -16, -6, 2, true);
+        ctx.restore();
+      }
+      if (u > 0.34 && u < 0.62) {                             // spray as he punches through
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        for (let i = 0; i < 9; i++) {
+          ctx.fillRect(Math.round(rx - 8 + (i % 4) * 6),
+            Math.round(ry - 4 - ((i * 7) % 14) - (u - 0.34) * 40), 3, 3);
+        }
+      }
+      // no banner here — say('PULLED BACK', …) owns the headline for the whole beat
     },
 
     updateRide(dt) {
       if (this.dropT > 0) {
-        // Right-of-way: he's deeper and already going. The whole drop is your window to
-        // pull back off it — except the last beat, by which point you're committed and
-        // it's his shoulder you're standing on.
-        if (this.snake && !this.snake.yielded) {
-          if (this.dropT > 0.6 && input.pressed('a')) { this.pullBack(); return; }
+        // the tail of the pull-back window (it started at the commit press, back in the
+        // lineup) — press again and you're off it, whatever kind of wave this is
+        if (this.pullT > 0) {
+          this.pullT -= dt;
+          if (input.pressed('a')) { this.startPullback(); return; }
         }
         // the drop: accelerating fall from the lip into the pocket, no bury risk yet
         this.dropT -= dt;
@@ -1338,6 +1494,7 @@ export function makeScenes(game) {
       else if (this.mode === 'npc') this.drawNpc(ctx, p);
       else if (this.mode === 'ride') this.drawRide(ctx, p);
       else if (this.mode === 'exit') this.drawExit(ctx, p);
+      else if (this.mode === 'pullback') this.drawPullback(ctx, p);
       else this.drawPitch(ctx, p);
       for (const f of this.floaters) text(ctx, f.txt, f.x, f.y, 8, '#f8f890', 'center');
       if (shk) ctx.restore();
@@ -1515,7 +1672,8 @@ export function makeScenes(game) {
         const r = 10 + ((this.animT * 18) % 8);
         ctx.strokeStyle = 'rgba(72,208,72,0.8)';
         ctx.strokeRect(this.px - r, py - r / 2 + 2, r * 2, r);
-        text(ctx, 'COMMITTED!', this.px, py - 24, 9, '#48d048', 'center');
+        text(ctx, 'COMMITTED!', Math.max(30, Math.min(W - 30, this.px)), py - 24, 9, '#48d048', 'center');
+        this.drawPullPrompt(ctx, 44);
       } else if (input.usedTouch && w.makeable && q > 0.5 && Math.floor(this.animT * 3) % 2 === 0) {
         // touch players get a big unmissable prompt — the whole screen is the button
         text(ctx, 'TAP TO GO!', W / 2, 40, 16, '#48d048', 'center');
@@ -1817,22 +1975,19 @@ export function makeScenes(game) {
           ctx.fillRect(pkX - 6 + (i % 2) * 6, Math.round(this.py) - i * 9, 3, 5);
         }
         // right-of-way: he's deeper (left of you) and already on his feet — you're on
-        // his shoulder. The whole drop is the window to pull back off it.
+        // his shoulder, and the pull-back window is your way out of it
         if (this.snake && !this.snake.yielded) {
           const sx = pkX - 42 + dk * 12;
           const sy = this.py + 10 + dk * 6;
           if (!drawRiderImg(ctx, localKey(this.riders[this.snake.idx].type, 'drop'), sx, sy, 0.16)) {
             drawMap(ctx, MAPS.paddleA, sx - 16, sy - 6, 2, true);
           }
-          const tooLate = this.dropT <= 0.6;
           if (Math.floor(this.animT * 6) % 2) {
-            text(ctx, tooLate ? 'YOU\'RE SNAKING HIM...' : 'HE HAS THE RIGHT OF WAY',
-              W / 2, 30, 9, tooLate ? '#f85838' : '#f8f890', 'center');
-          }
-          if (!tooLate) {
-            text(ctx, input.usedTouch ? 'TAP TO PULL BACK' : 'X TO PULL BACK', W / 2, 44, 9, '#48d048', 'center');
+            text(ctx, this.pullT > 0 ? 'HE HAS THE RIGHT OF WAY' : 'YOU\'RE SNAKING HIM...',
+              W / 2, 30, 9, this.pullT > 0 ? '#f8f890' : '#f85838', 'center');
           }
         }
+        this.drawPullPrompt(ctx, 46);
       } else if (this.trickKind === 'spin') {
         // Both riders are prone through this, but they turn about different axes: the
         // boarder pivots FLAT on the deck (a cartwheel seen from above), the bodysurfer
@@ -1951,7 +2106,7 @@ export function makeScenes(game) {
       if (this.chain > 0) text(ctx, `CHAIN ${this.chain} · x${this.chainMult().toFixed(2)}`, 6, 42, 7, '#8ce8a0');
       // the steering/trick hints stay out of the way while the pull-back prompt is up —
       // on a right-of-way wave X means "get off it", not "do a trick"
-      const pullingBack = this.dropT > 0 && this.snake && !this.snake.yielded;
+      const pullingBack = this.dropT > 0 && this.pullT > 0;
       if (this.rt < 3.2 && !pullingBack) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
         // same three zones for both riders, different moves in the top one
