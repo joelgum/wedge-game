@@ -33,7 +33,7 @@ function newDailyRand() { return mulberry32(hashStr(dailyKey())); }
 // Preloaded background art (Midjourney-derived, served from ./assets/ by serve.py).
 // Scenes draw these when loaded and fall back to procedural rendering until then.
 const IMG = {};
-function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=16'; IMG[key] = i; }
+function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=17'; IMG[key] = i; }
 function imgReady(key) { const i = IMG[key]; return i && i.complete && i.naturalWidth > 0; }
 loadImg('title', 'title.png');
 loadImg('select', 'select.png');

@@ -10,8 +10,11 @@
 > |---|---|---|
 > | B1–B3 | `spr_b_sit_n1..n3` | the three NPC boarders' lineup frames — carry build and gender, which a recolour can't |
 > | S1–S3 | `spr_s_tread_n1..n3` | the three NPC bodysurfers', same |
-> | 9 | `spr_s_tread` | the player's own bodysurfer is still the *old* character here |
-> | 10 | `spr_s_drop` | and here |
+> | ~~9~~ | ~~`spr_s_tread`~~ | ✅ generated and installed 2026-07-27 |
+> | ~~10~~ | ~~`spr_s_drop`~~ | ✅ generated and installed 2026-07-27 |
+>
+> **The bodysurfer is now one character in every frame** — the six NPC lineup frames are
+> all that's left.
 >
 > Nothing else in the game is missing art: every other `loadImg` resolves to a file in
 > `assets/`, and every file in `assets/` is used.
@@ -342,12 +345,28 @@ bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 
 ---
 
-## The player's own bodysurfer — the last two old frames
+## The player's own bodysurfer — ✅ done 2026-07-27
 
-These two are still the **original** character (pale skin, blue/green striped trunks, no
-dark outline) while every other frame he appears in is the dark-haired, teal-trunked one
-from the trick batch, so he changes look between the lineup and the ride. Same character
-sheet as `spr_s_tube` / `spr_s_roll`: **dark hair, brown skin, teal trunks, dark fins.**
+Both generated and installed; he is now the same character in every frame. Originals kept
+at `art-src/spr_s_tread_v1.png` / `spr_s_drop_v1.png`. Prompts kept for re-rolls.
+
+**Both needed `--crop`**, which is why the option exists:
+
+```sh
+python3 execution/pixelate_sprite.py --crop 175,315,765,955 --scale 0.65 art-src/spr_s_tread.jpg assets/spr_s_tread.png
+python3 execution/pixelate_sprite.py --crop 105,265,890,910 --scale 0.65 art-src/spr_s_drop.jpg  assets/spr_s_drop.png
+```
+
+Gemini drew the tread frame's waterline **edge to edge across the whole 1024 frame**, so
+the untrimmed sprite came out 72 px wide — a bright horizontal line that would have been
+painted across the sea. The drop frame's spray plume ran off the bottom-left corner and
+padded the bbox the same way. Watch for both: if `--report` gives a width far larger than
+the figure, something scenic is touching the frame edge.
+
+Note the tread pose came back **horizontal** — floating prone, whole body visible through
+the water — rather than the upright "head and shoulders clear" the prompt asked for. It
+reads well in the lineup (they look like bodysurfers waiting, not swimmers standing up), so
+it was kept. If you ever re-roll it, that's the line to make more forceful.
 
 ### 9 — `spr_s_tread.png` · treading in the lineup
 
