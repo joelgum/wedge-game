@@ -69,6 +69,10 @@ stance, and drops off again once you're trimming. It still can't overtake you.
 
 ## Reading the wave
 
+- **The locals are individuals.** Each of the three rolls a rider type *and* an identity at
+  the start of a run and keeps both — different board, trunks and fins, dealt without
+  replacement so you never get the same person twice. The one who drops in on you is a
+  face you've been sitting next to all session.
 - **Someone else's wave.** Roughly one in five makeable waves, a local swings deep and
   starts stroking for it — he ends up on your left, nearer the peak, labelled **HIS WAVE**.
   He has the right of way. Let it go for +150, or take off and pull back out of it for

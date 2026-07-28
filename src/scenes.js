@@ -76,6 +76,51 @@ const TRICK_ART = {
   // cos(roll), never the arms-out ragdoll toss (sp_s_spin).
   surfer: { spin: 'sp_s_roll', tube: 'sp_s_tube', stance: 'sp_s_layback' },
 };
+// The three NPC identities per rider type, matching the table in SPRITE_PROMPTS.md.
+// `rules` recolour the shared pose frames (hue windows below are measured off the art);
+// `id` also names that identity's own generated lineup frame — `spr_b_sit_n1.png` loads
+// as `sp_b_sit_n1` and takes over the sit pose the moment it exists.
+// Hue windows measured off the actual frames. The lower bound on `trunks` matters: sea
+// spray in the newer sprites sits at 190-203°, so a window that starts at 190 recolours
+// the spray along with the shorts.
+const HUE = {
+  board: [40, 65],      // the yellow bodyboard
+  top: [70, 150],       // the green tank (old frames sit at 85, the new ones at 127)
+  trunks: [206, 255],   // blue trunks — the boarder's, and the OLD bodysurfer frames'
+  teal: [160, 189],     // the new bodysurfer's teal trunks
+};
+const DARK = { sat: 0.06, mul: 0.38 };     // "black" gear: drained and dropped, not rehued
+// The bodysurfer's poses aren't all the same character yet: paddle/ride are the new
+// teal-trunked frames while sit/drop are still the old blue-and-green striped ones. So a
+// surfer identity sweeps ALL THREE gear windows to one target — that's what makes a
+// striped short read as a solid colour instead of a half-recoloured mess, and it keeps an
+// identity looking like itself across poses. Once spr_s_tread / spr_s_drop are
+// regenerated the blue and green windows simply stop matching.
+const surferGear = (to, sat) => [HUE.teal, HUE.trunks, HUE.top].map((from) => ({ from, to, sat }));
+const NPC_LOOKS = {
+  boarder: [
+    // the grom — red board, black trunks, no tank (the green is retinted to bare skin)
+    { id: 'n1', rules: [{ from: HUE.board, to: 2, sat: 0.74 }, { from: HUE.top, to: 18, sat: 0.42 }, { from: HUE.trunks, to: 0, ...DARK }] },
+    // the veteran — faded orange board, black wetsuit vest, black trunks
+    { id: 'n2', rules: [{ from: HUE.board, to: 26, sat: 0.62 }, { from: HUE.top, to: 0, ...DARK }, { from: HUE.trunks, to: 0, ...DARK }] },
+    // her wave — purple board, teal one-piece
+    { id: 'n3', rules: [{ from: HUE.board, to: 282, sat: 0.52 }, { from: HUE.top, to: 176, sat: 0.55 }, { from: HUE.trunks, to: 176, sat: 0.55 }] },
+  ],
+  surfer: [
+    { id: 'n1', rules: surferGear(28, 0.85) },    // orange trunks
+    { id: 'n2', rules: surferGear(322, 0.68) },   // magenta one-piece
+    { id: 'n3', rules: surferGear(0, 0.05) },     // grey trunks
+  ],
+};
+// Generated NPC lineup frames — uncomment as each lands (see SPRITE_PROMPTS.md § NPC batch).
+// Until then every identity is the shared frame recoloured, so the crowd already varies.
+// loadImg('sp_b_sit_n1', 'spr_b_sit_n1.png');
+// loadImg('sp_b_sit_n2', 'spr_b_sit_n2.png');
+// loadImg('sp_b_sit_n3', 'spr_b_sit_n3.png');
+// loadImg('sp_s_tread_n1', 'spr_s_tread_n1.png');
+// loadImg('sp_s_tread_n2', 'spr_s_tread_n2.png');
+// loadImg('sp_s_tread_n3', 'spr_s_tread_n3.png');
+
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
 // band/tube/exit are multipliers on the base pocket width, tube scoring, and exit bonus.
@@ -103,6 +148,65 @@ const TRICK_SLOW = 1.25;
 // second thoughts about (see startPullback).
 const PULL_WIN = 1.5;
 const PULL_BEAT = 1.9;   // length of the over-the-back cinematic
+
+// ---- NPC recolouring -------------------------------------------------------------
+// The locals used to be three clones of whatever the player picked. Each one now carries
+// an identity (see NPC_LOOKS) whose gear colours are swapped onto the shared pose frames
+// at load, so the lineup reads as a crowd without four generated frames per person.
+//
+// Only GEAR is swapped — board, top, trunks. Hair, skin, fins and the outline all sit in
+// the same near-black / near-brown bands in the older frames and can't be separated by
+// hue, so those stay put here and are carried instead by the identity's own generated
+// lineup frame (spr_b_sit_nN / spr_s_tread_nN).
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+  const h = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60;
+  return [h, s, l];
+}
+function hslToRgb(h, s, l) {
+  h = ((h % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+// rules: [{ from: [hMin, hMax], to: hue, sat }] — a pixel whose hue falls in the window
+// (and which is colourful and bright enough to be gear rather than outline) is rehued,
+// keeping its own lightness so the shading survives. Returns a canvas that quacks like an
+// Image, so drawRiderImg/imgReady need no changes.
+function recolourImg(srcKey, dstKey, rules) {
+  const src = IMG[srcKey];
+  if (!(src && src.complete && src.naturalWidth > 0)) return false;
+  const w = src.naturalWidth, h = src.naturalHeight;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  c.imageSmoothingEnabled = false;
+  c.drawImage(src, 0, 0);
+  const d = c.getImageData(0, 0, w, h), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i + 3] < 128) continue;
+    const [hu, sa, li] = rgbToHsl(p[i], p[i + 1], p[i + 2]);
+    if (sa < 0.25 || li < 0.16 || li > 0.94) continue;      // outline, shadow, spray
+    for (const r of rules) {
+      const inWin = r.from[0] <= r.from[1]
+        ? (hu >= r.from[0] && hu <= r.from[1])
+        : (hu >= r.from[0] || hu <= r.from[1]);             // window wrapping through 0°
+      if (!inWin) continue;
+      const [nr, ng, nb] = hslToRgb(r.to, r.sat === undefined ? sa : r.sat,
+                                    r.mul === undefined ? li : li * r.mul);
+      p[i] = nr; p[i + 1] = ng; p[i + 2] = nb;
+      break;
+    }
+  }
+  c.putImageData(d, 0, 0);
+  cv.complete = true; cv.naturalWidth = w; cv.naturalHeight = h;
+  IMG[dstKey] = cv;
+  return true;
+}
 
 // Draw a rider-art frame centered at (cx, cy) with optional rotation, crisp (no smoothing).
 // Returns false if the image isn't loaded yet so callers can fall back to procedural sprites.
@@ -195,8 +299,20 @@ export function makeScenes(game) {
   };
   const spr = () => SPR[game.rider] || SPR.boarder;
   const riderKey = (pose) => (RIDER_ART[game.rider] || RIDER_ART.boarder)[pose];
-  // same lookup for an NPC local, whose type is his own — not the player's
-  const localKey = (type, pose) => (RIDER_ART[type] || RIDER_ART.boarder)[pose];
+  // same lookup for an NPC local, whose type is his own — not the player's. `look` is his
+  // identity index: prefer that identity's own generated frame, else recolour the shared
+  // one (built once, on first use, since the base image may still be loading), else the
+  // shared frame as-is.
+  const localKey = (type, pose, look) => {
+    const base = (RIDER_ART[type] || RIDER_ART.boarder)[pose];
+    const L = look == null ? null : (NPC_LOOKS[type] || [])[look];
+    if (!L) return base;
+    const gen = base + '_' + L.id;
+    if (imgReady(gen)) return gen;
+    const key = base + '~' + L.id;
+    if (!IMG[key]) recolourImg(base, key, L.rules);
+    return imgReady(key) ? key : base;
+  };
   // dedicated trick frame if its art has loaded, otherwise the transformed stand-in
   const trickArt = (kind, fallback) => {
     const k = (TRICK_ART[game.rider] || TRICK_ART.boarder)[kind];
@@ -372,12 +488,17 @@ export function makeScenes(game) {
       // The lineup is a mixed crowd — spongers and bodysurfers side by side, whichever
       // one you picked. Each local rolls his type once at the start of the run and keeps
       // it, so the crowd around you stays the same faces wave to wave.
+      // …and each also rolls an identity (NPC_LOOKS) — different gear, and its own
+      // lineup frame once that art exists. Looks are dealt without replacement per type,
+      // so two locals of the same kind are never the same person.
       const localType = () => (Math.random() < 0.5 ? 'boarder' : 'surfer');
-      this.riders = [
-        { x: 40, ph: 0, type: localType() },
-        { x: 74, ph: 2.1, type: localType() },
-        { x: 120, ph: 4.2, type: localType() },
-      ];
+      const bag = { boarder: [0, 1, 2], surfer: [0, 1, 2] };
+      const localLook = (type) => {
+        const b = bag[type];
+        return b.length ? b.splice(Math.floor(Math.random() * b.length), 1)[0] : 0;
+      };
+      this.riders = [{ x: 40, ph: 0 }, { x: 74, ph: 2.1 }, { x: 120, ph: 4.2 }]
+        .map((r) => { r.type = localType(); r.look = localLook(r.type); return r; });
       this.newWave();
       audio.ensure(); audio.startMusic();
     },
@@ -694,6 +815,7 @@ export function makeScenes(game) {
       }
       this.nHide = best;
       this.nType = this.riders[best].type || 'boarder';     // he goes as whatever he is
+      this.nLook = this.riders[best].look;                  // …wearing his own gear
       this.say(opts.msg || (this.nMake ? 'GOING ON A SMALL ONE...' : 'GOING ON A WALLED ONE...'),
         opts.sub || null, 1.5);
       audio.tone(58, 0.8, { type: 'triangle', vol: 0.07, slide: 20 });
@@ -789,7 +911,7 @@ export function makeScenes(game) {
       this.lipX = this.peakX();
       // snaked: it's a normal makeable wave and you took off where you stood
       this.pSnake = snaked
-        ? { type: this.riders[this.snake.idx].type || 'boarder' }
+        ? { type: this.riders[this.snake.idx].type || 'boarder', look: this.riders[this.snake.idx].look }
         : null;
       this.takeX = Math.min(206, snaked ? this.px : this.sweetX());   // where he committed / drops in
       this.pSpin = (Math.random() < 0.5 ? -1 : 1);
@@ -880,7 +1002,7 @@ export function makeScenes(game) {
         const sx = (this.takeX - 62) + u * 172;
         const sy = crestY + 30 + u * (SURFACE - 16 - (crestY + 30));
         if (sx < W + 20) {
-          if (!drawRiderImg(ctx, localKey(this.pSnake.type, 'ride'), sx, sy, -0.1)) {
+          if (!drawRiderImg(ctx, localKey(this.pSnake.type, 'ride', this.pSnake.look), sx, sy, -0.1)) {
             drawMap(ctx, MAPS.trim, sx - 16, sy - 6, 2, true);
           }
           ctx.fillStyle = 'rgba(255,255,255,0.8)';   // his spray trail down the line
@@ -1650,7 +1772,7 @@ export function makeScenes(game) {
         const rx = deep ? this.snake.x : r.x;
         const ry = LINEUP_Y + Math.sin(this.animT * 2 + r.ph) * 2 - this.waveH(rx, q) * 0.25 * q * q;
         const stroking = paddling || (deep && q > 0.42);
-        if (!drawRiderImg(ctx, localKey(r.type, stroking ? 'paddle' : 'sit'), rx, ry - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, rx - 16, ry - 6, 2, true);
+        if (!drawRiderImg(ctx, localKey(r.type, stroking ? 'paddle' : 'sit', r.look), rx, ry - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, rx - 16, ry - 6, 2, true);
         if (deep && q > 0.42 && Math.floor(this.animT * 4) % 2) {
           // kept clear of the frame edges — he sits deep, and the label must not clip
           text(ctx, 'HIS WAVE', Math.max(32, Math.min(W - 32, rx)), ry - 22, 7, '#f85838', 'center');
@@ -1751,7 +1873,7 @@ export function makeScenes(game) {
         }
       }
       // ---- the NPC rider, per phase (drawn as whichever kind of local he is) ----
-      const nk = (pose) => localKey(this.nType, pose);
+      const nk = (pose) => localKey(this.nType, pose, this.nLook);
       let rx, ry, rot = 0, key = nk('paddle');
       if (this.nT < ph.STAND) {
         rx = this.nTakeX;                                    // paddling in as it stands up
@@ -1794,7 +1916,7 @@ export function makeScenes(game) {
         if (i === this.nHide) continue;
         const r = this.riders[i];
         const ry2 = LINEUP_Y + Math.sin(this.animT * 2 + r.ph) * 2 - hAt(r.x) * 0.25 * q * q;
-        if (!drawRiderImg(ctx, localKey(r.type, 'sit'), r.x, ry2 - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, r.x - 16, ry2 - 6, 2, true);
+        if (!drawRiderImg(ctx, localKey(r.type, 'sit', r.look), r.x, ry2 - 4, 0, 0)) drawMap(ctx, MAPS.paddleA, r.x - 16, ry2 - 6, 2, true);
       }
       const py = LINEUP_Y + Math.sin(this.animT * 2.6) * 2 - hAt(this.px) * 0.25 * q * q;
       if (!drawRiderImg(ctx, riderKey('sit'), this.px, py - 4, 0, 0)) {
@@ -1979,7 +2101,7 @@ export function makeScenes(game) {
         if (this.snake && !this.snake.yielded) {
           const sx = pkX - 42 + dk * 12;
           const sy = this.py + 10 + dk * 6;
-          if (!drawRiderImg(ctx, localKey(this.riders[this.snake.idx].type, 'drop'), sx, sy, 0.16)) {
+          if (!drawRiderImg(ctx, localKey(this.riders[this.snake.idx].type, 'drop', this.riders[this.snake.idx].look), sx, sy, 0.16)) {
             drawMap(ctx, MAPS.paddleA, sx - 16, sy - 6, 2, true);
           }
           if (Math.floor(this.animT * 6) % 2) {

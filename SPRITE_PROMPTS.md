@@ -194,23 +194,205 @@ The bodysurfer has no air trick; he stays on the water, so his top-of-band tap p
 into the barrel instead (`spr_s_tube.png`). `spr_s_spin.png` (arms-out "U") is **not** a
 trick frame — it's the ragdoll toss when a wave pitches you, and nothing else should use it.
 
-### The locals need no new art
-Right-of-way waves and the interstitial NPC beat draw the other riders from the frames
-already in `assets/` (`spr_b_*` / `spr_s_*`), picked by that local's own type. Nothing to
-generate for them.
+### The locals used to need no new art — see the NPC batch below
+Right-of-way waves and the interstitial NPC beat draw the other riders from the same frames
+the *player* uses, picked by that local's own type. That's why the lineup is three clones of
+whoever you picked. The batch below fixes it.
 
 ---
 
+# NPC batch — the lineup stops being clones
+
+Written 2026-07-27. **Eight prompts**: six NPC identities (three boarders, three
+bodysurfers) plus the two replacement frames the player's own bodysurfer still needs.
+
+## Why only the lineup pose is generated
+
+Every rider needs four poses — `sit`, `paddle`, `drop`, `ride`. Generating four poses × six
+identities is 24 renders, and Gemini's character drift between poses is exactly what went
+wrong with the bodysurfer last time: you'd be judging continuity 24 times.
+
+So each identity gets **one generated frame — the lineup pose** — and the loader recolours
+that identity's palette onto the shared frames for the other three. The lineup is where the
+variety actually reads: it's the pose the game spends most of its time in, with all three
+locals side by side. The consequence to know about: **build and gender are a lineup-only
+tell.** Once a local drops in, he or she is the standard silhouette wearing that identity's
+colours. At 30 px in a one-second beat that holds up; if a variant ever needs to read as
+itself mid-ride, generate its `ride` frame too and drop it in under the same name.
+
+## Pin the palette before you generate
+
+The recolour needs to know which colour means what, so each identity's colours are fixed
+here and the prompt just describes them. **If Gemini gives you a different shade, keep the
+render and tell me the actual hexes** — the swap table is edited to match the art, never the
+other way round.
+
+| # | File | Who | Hair | Skin | Top | Trunks | Board / fins |
+|---|---|---|---|---|---|---|---|
+| B1 | `spr_b_sit_n1.png` | small wiry grom, ~14 | bleached blond mop | pale, sunburnt | bare chest | black | **red** board, blue fins |
+| B2 | `spr_b_sit_n2.png` | heavyset veteran, ~55 | grey buzz cut + moustache | deep tan | black wetsuit vest | black | **faded orange** board, yellow fins |
+| B3 | `spr_b_sit_n3.png` | woman, athletic | dark ponytail | brown | teal one-piece | — | **purple** board, pink fins |
+| S1 | `spr_s_tread_n1.png` | tall lanky guy | red, shaggy | freckled pale | bare chest | orange | bright blue fins |
+| S2 | `spr_s_tread_n2.png` | woman, strong shoulders | black hair in a bun | brown | magenta one-piece | — | lime fins |
+| S3 | `spr_s_tread_n3.png` | heavyset older guy | bald / shaved | deep tan | black wetsuit top | grey | orange fins |
+
+Boarders sit **on** the board in the lineup; bodysurfers tread water with just head and
+shoulders clear. Everything faces **RIGHT**, same as the rest of the set.
+
 ---
 
-## Still to do — the last two old bodysurfer frames
+## B1 — `spr_b_sit_n1.png` · the grom
 
-`spr_s_tread.png` (bobbing in the lineup) and `spr_s_drop.png` (dropping in) are still the
-**original** bodysurfer: pale skin, blue/green striped trunks, no dark outline. Every other
-frame he appears in is now the dark-haired, teal-trunked character, so he still changes
-between the lineup and the ride. Two more generations fix it — reuse the style block above
-with *"dark hair, teal trunks"*, one treading water upright with just his head and
-shoulders clear, one stroking into the drop head-down on a steep face.
+```
+8-bit pixel art game sprite of a small skinny teenage bodyboarder sitting on his board in
+the lineup waiting for a wave, sitting upright astride a red bodyboard floating flat on the
+water, both hands resting on the rails, short swim fins dangling below the surface, small
+wiry build with narrow shoulders, bleached blond surfer mop of hair, pale sunburnt skin,
+bare chest, black boardshorts, blue swim fins, calm water line across his waist, NES video
+game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing,
+no gradients, single figure, side view facing RIGHT, centered on a plain solid magenta
+background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading, standing
+surfer, surfboard, multiple figures, grid, reference sheet, text, watermark
+```
+
+## B2 — `spr_b_sit_n2.png` · the veteran
+
+```
+8-bit pixel art game sprite of a heavyset older man sitting on his bodyboard in the lineup
+waiting for a wave, sitting upright astride a faded orange bodyboard floating flat on the
+water, both hands resting on the rails, short swim fins dangling below the surface, thick
+barrel-chested build with broad round shoulders and a belly, short grey buzz cut and a grey
+moustache, deeply tanned leathery skin, sleeveless black wetsuit vest, black boardshorts,
+yellow swim fins, calm water line across his waist, NES video game style 1987, limited
+16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single
+figure, side view facing RIGHT, centered on a plain solid magenta background for easy
+cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfboard,
+multiple figures, grid, reference sheet, text, watermark
+```
+
+## B3 — `spr_b_sit_n3.png` · her wave
+
+```
+8-bit pixel art game sprite of an athletic young woman sitting on her bodyboard in the
+lineup waiting for a wave, sitting upright astride a purple bodyboard floating flat on the
+water, both hands resting on the rails, short swim fins dangling below the surface, lean
+athletic build with strong shoulders, long dark hair pulled back in a high ponytail, brown
+skin, teal one-piece swimsuit, pink swim fins, calm water line across her waist, NES video
+game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing,
+no gradients, single figure, side view facing RIGHT, centered on a plain solid magenta
+background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading, standing
+surfer, surfboard, bikini, multiple figures, grid, reference sheet, text, watermark
+```
+
+## S1 — `spr_s_tread_n1.png` · the lanky one
+
+```
+8-bit pixel art game sprite of a tall lanky young bodysurfer treading water upright in the
+lineup waiting for a wave, no surfboard and no bodyboard and no handplane, bare hands,
+submerged to mid-chest with only his head and shoulders clear of the surface, long thin
+arms sculling at the waterline, thin narrow build, shaggy red hair, pale freckled skin,
+bare chest, orange trunks, bright blue swim fins just visible under the water, calm water
+line across his chest, NES video game style 1987, limited 16-color palette, chunky pixels,
+flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, standing surfer, surfboard, bodyboard, handplane, multiple figures,
+grid, reference sheet, text, watermark
+```
+
+## S2 — `spr_s_tread_n2.png` · shoulders
+
+```
+8-bit pixel art game sprite of a strong young woman treading water upright in the lineup
+waiting for a wave, no surfboard and no bodyboard and no handplane, bare hands, submerged
+to mid-chest with only her head and shoulders clear of the surface, arms sculling at the
+waterline, broad swimmer's shoulders, black hair pulled up in a tight bun, brown skin,
+magenta one-piece swimsuit, lime green swim fins just visible under the water, calm water
+line across her chest, NES video game style 1987, limited 16-color palette, chunky pixels,
+flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, standing surfer, surfboard, bodyboard, handplane, bikini, multiple
+figures, grid, reference sheet, text, watermark
+```
+
+## S3 — `spr_s_tread_n3.png` · the old boy
+
+```
+8-bit pixel art game sprite of a heavyset older bodysurfer treading water upright in the
+lineup waiting for a wave, no surfboard and no bodyboard and no handplane, bare hands,
+submerged to mid-chest with only his head and thick shoulders clear of the surface, arms
+sculling at the waterline, heavy round build with a broad neck, bald shaved head, deeply
+tanned leathery skin, sleeveless black wetsuit top, grey trunks, orange swim fins just
+visible under the water, calm water line across his chest, NES video game style 1987,
+limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients,
+single figure, side view facing RIGHT, centered on a plain solid magenta background for
+easy cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfboard,
+bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
+```
+
+---
+
+## The player's own bodysurfer — the last two old frames
+
+These two are still the **original** character (pale skin, blue/green striped trunks, no
+dark outline) while every other frame he appears in is the dark-haired, teal-trunked one
+from the trick batch, so he changes look between the lineup and the ride. Same character
+sheet as `spr_s_tube` / `spr_s_roll`: **dark hair, brown skin, teal trunks, dark fins.**
+
+### 9 — `spr_s_tread.png` · treading in the lineup
+
+```
+8-bit pixel art game sprite of a 1980s bodysurfer treading water upright in the lineup
+waiting for a wave, no surfboard and no bodyboard and no handplane, bare hands, submerged
+to mid-chest with only his head and shoulders clear of the surface, both arms sculling
+outward at the waterline, chin up watching the horizon, average athletic build, dark hair,
+brown skin, teal trunks, dark short swim fins just visible under the water, calm water line
+across his chest, NES video game style 1987, limited 16-color palette, chunky pixels, flat
+shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on
+a plain solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth
+shading, standing surfer, surfboard, bodyboard, handplane, multiple figures, grid,
+reference sheet, text, watermark
+```
+
+### 10 — `spr_s_drop.png` · stroking into the drop
+
+```
+8-bit pixel art game sprite of a 1980s bodysurfer dropping in on a steep wave, no surfboard
+and no bodyboard and no handplane, bare hands, body angled steeply head-down and forward as
+he takes the drop, lead arm punched out and down in front of him reaching for the face,
+trailing arm mid-stroke back along his hip, short swim fins kicking hard behind him and
+throwing spray, chin up looking down the line, dark hair, brown skin, teal trunks, dark
+short swim fins, spray off his kick, NES video game style 1987, limited 16-color palette,
+chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view
+facing RIGHT and angled downward, centered on a plain solid magenta background for easy
+cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfboard,
+bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
+```
+
+## Converting this batch
+
+Same as the trick batch — the lineup poses are smaller in frame than an action pose, so
+check `--report` and adjust:
+
+```sh
+python3 execution/pixelate_sprite.py --report art-src/spr_b_sit_n1.jpg
+python3 execution/pixelate_sprite.py --scale 0.65 art-src/spr_b_sit_n1.jpg assets/spr_b_sit_n1.png
+```
+
+Target heights: boarders sitting ≈ 34–38 px (next to `spr_b_sit.png` at 36), bodysurfers
+treading ≈ 34–38 px (next to `spr_s_tread.png` at 37). If a render comes out short because
+the figure sits small in the 1024 frame, raise `--scale` rather than accepting a 24 px NPC.
+
+## Judging this batch
+
+Everything in the checklist at the top of the file, plus:
+
+- **Waterline, not a full body.** Both lineup poses are half-submerged. A render showing
+  legs and feet below the surface is wrong — the game draws these bobbing at the sea line.
+- **The board is flat, not upright.** Boarders sit astride a board lying flat on the water.
+  Gemini likes to stand the board up like a surfboard.
+- **Silhouettes must differ at a glance.** Put the three boarders side by side at 1:1 and
+  squint: if you can't tell the grom from the veteran without colour, the build didn't come
+  through and it's worth a re-roll — colour alone is what the recolour already gives you.
 
 The boarder needs nothing: his old frames already match the new set.
 
