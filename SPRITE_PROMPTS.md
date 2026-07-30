@@ -330,6 +330,52 @@ figures, grid, reference sheet, text, watermark
 
 ## S3 — `spr_s_tread_n3.png` · the old boy
 
+> ⚠️ **The original wording was refused by AI Studio as "prohibited content"** (2026-07-27).
+> No phrase was named, but the language unique to this prompt was a stack of body and skin
+> descriptors on a realistic person — `heavyset older`, `heavy round build with a broad
+> neck`, `bald shaved head`, `deeply tanned leathery skin`. Use **v2** below. The original
+> is kept underneath for the record, since the refusal is partly stochastic and B2 carries
+> some of the same words without tripping.
+>
+> **This is the one identity that can ship with no art at all:** the recolour already gives
+> him grey trunks and grey fins, so a persistent refusal only costs the build tell. Don't
+> burn a dozen attempts here.
+
+### v2 — use this one
+
+```
+8-bit pixel art game sprite of a stocky veteran bodysurfer waiting in the lineup for a
+wave, no surfboard and no bodyboard and no handplane, bare hands, floating chest-deep in
+calm water with his head and broad shoulders above the surface, arms sculling along the
+waterline, barrel-chested and thick through the middle, bald, weather-beaten tan,
+sleeveless black wetsuit top, grey trunks, orange swim fins showing beneath the water, calm
+water line across his chest, NES video game style 1987, limited 16-color palette, chunky
+pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing
+RIGHT, centered on a plain solid magenta background for easy cutout --ar 1:1 --no
+photorealism, blur, smooth shading, standing surfer, surfboard, bodyboard, handplane,
+multiple figures, grid, reference sheet, text, watermark
+```
+
+### v3 — if v2 is refused too
+
+Drops every body and skin descriptor and carries his age and bulk on **gear and posture
+alone**. Least likely to be refused, weakest silhouette tell.
+
+```
+8-bit pixel art game sprite of a bodysurfer waiting in the lineup for a wave, no surfboard
+and no bodyboard and no handplane, bare hands, floating chest-deep in calm water with his
+head and shoulders above the surface, arms sculling along the waterline, wide heavy
+shoulders hunched forward, bald, sleeveless black wetsuit top, grey trunks, orange swim
+fins showing beneath the water, calm water line across his chest, NES video game style
+1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no
+gradients, single figure, side view facing RIGHT, centered on a plain solid magenta
+background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading, standing
+surfer, surfboard, bodyboard, handplane, young, slim, multiple figures, grid, reference
+sheet, text, watermark
+```
+
+<details><summary>v1 — the refused original, for the record</summary>
+
 ```
 8-bit pixel art game sprite of a heavyset older bodysurfer treading water upright in the
 lineup waiting for a wave, no surfboard and no bodyboard and no handplane, bare hands,
@@ -342,6 +388,13 @@ single figure, side view facing RIGHT, centered on a plain solid magenta backgro
 easy cutout --ar 1:1 --no photorealism, blur, smooth shading, standing surfer, surfboard,
 bodyboard, handplane, multiple figures, grid, reference sheet, text, watermark
 ```
+
+</details>
+
+### If B2 (the boarder veteran) gets refused as well
+
+It shares `heavyset older man` and `deeply tanned leathery skin` with v1. Swap those for
+`stocky veteran man` and `weather-beaten tan` — same edit, same reasoning.
 
 ---
 
