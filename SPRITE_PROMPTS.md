@@ -8,13 +8,15 @@
 >
 > | | Prompt | Why it's outstanding |
 > |---|---|---|
-> | B1–B3 | `spr_b_sit_n1..n3` | the three NPC boarders' lineup frames — carry build and gender, which a recolour can't |
-> | S1–S3 | `spr_s_tread_n1..n3` | the three NPC bodysurfers', same |
+> | ~~B1–B3~~ | ~~`spr_b_sit_n1..n3`~~ | ✅ generated and installed 2026-07-29 |
+> | ~~S1–S3~~ | ~~`spr_s_tread_n1..n3`~~ | ✅ generated and installed 2026-07-29 |
 > | ~~9~~ | ~~`spr_s_tread`~~ | ✅ generated and installed 2026-07-27 |
 > | ~~10~~ | ~~`spr_s_drop`~~ | ✅ generated and installed 2026-07-27 |
 >
-> **The bodysurfer is now one character in every frame** — the six NPC lineup frames are
-> all that's left.
+> **The game is no longer missing any art.** One open question, not a missing file: the
+> three NPC bodysurfers came back **upright**, as asked, while the player's own
+> `spr_s_tread` came back **horizontal** and was kept — so in a bodysurfer lineup the
+> locals stand and you float. See *Conversion notes* at the bottom of the NPC batch.
 >
 > Nothing else in the game is missing art: every other `loadImg` resolves to a file in
 > `assets/`, and every file in `assets/` is used.
@@ -464,6 +466,57 @@ python3 execution/pixelate_sprite.py --scale 0.65 art-src/spr_b_sit_n1.jpg asset
 Target heights: boarders sitting ≈ 34–38 px (next to `spr_b_sit.png` at 36), bodysurfers
 treading ≈ 34–38 px (next to `spr_s_tread.png` at 37). If a render comes out short because
 the figure sits small in the 1024 frame, raise `--scale` rather than accepting a 24 px NPC.
+
+## Conversion notes — what this batch actually needed
+
+All six installed 2026-07-29. The commands are not uniform, because the renders weren't:
+
+```sh
+# boarders: key the deep water AND the surface highlight + ripple dashes (wider tol on
+# those two, or stray blue specks survive as pixels floating in mid-air)
+python3 execution/pixelate_sprite.py --key-at 952,636 --key-at 60,632,72 --key-at 60,670,72 \
+  --scale 0.61 art-src/spr_b_sit_n1.jpg assets/spr_b_sit_n1.png     # n2 same, n3 --scale 0.59
+# S1: no regular lattice at all -> sample at native res and crop off the full-width waterline
+python3 execution/pixelate_sprite.py --grid 1024 --crop 300,140,745,975 \
+  --key-at 296,512 --key-at 20,514 --scale 0.044 art-src/spr_s_tread_n1.jpg assets/spr_s_tread_n1.png
+# S2 / S3: 100x100 grids, no crop needed
+python3 execution/pixelate_sprite.py --key-at 92,528 --key-at 20,514 --scale 0.44 ...
+python3 execution/pixelate_sprite.py --key-at 0,524  --key-at 20,514 --scale 0.40 ...
+```
+
+**Three things this batch taught the converter.**
+
+1. **Gemini painted the sea as a second opaque field**, not as magenta. The default keying
+   only drops the corner colour, so the water came through as a solid block — hence
+   `--key-at`, repeatable, with an optional per-colour tolerance. The surface highlight and
+   ripple dashes are a *third* colour and need their own key.
+2. **`--grid` exists because S1 has no regular lattice.** Its block edges came in at
+   4.5–7.6 px, so it only *looks* blocky. Passing `--grid 1024` samples at native
+   resolution and lets `--scale` do the downsampling, which doesn't care about regularity.
+3. **The lattice tolerance had to become proportional to block size.** Held at a flat
+   1.2 px it is a large fraction of a small block, so every fine lattice "fits" — S1's real
+   grid is ~205 and the detector was confidently reporting 400+. Now a render with no real
+   grid correctly returns *no grid found* and tells you to use `--grid`.
+
+**Scales are per file, not the usual 0.65.** This batch arrived at three different logical
+resolutions (80, 100, and none) and wildly different zoom — S3 fills his whole frame, S1 is
+a small figure in a big one. Pick the scale from the measured bbox to land ~36 px tall, next
+to `spr_b_sit.png` at 36. Don't assume the house factor carries over.
+
+**Two cosmetic compromises, both accepted:** S2 and S3 are clipped by the bottom frame edge,
+so their fins are cut short; and S3 is drawn so zoomed that he's the bulkiest of the set by
+some margin, which happens to suit him.
+
+### ⚠️ Open: the bodysurfer lineup mixes poses
+
+The three NPC bodysurfers came back **upright**, exactly as prompted. The player's own
+`spr_s_tread` came back **horizontal** and was kept because it read well on its own. Put
+them side by side and the locals stand while you float — visible in a bodysurfer lineup.
+
+Cheapest fix is one render, not three: re-roll **prompt 9** with the upright pose stated
+hard (*"vertical body, upright in the water, legs hanging straight down, NOT lying flat"*)
+so the player matches the crowd. The alternative — re-rolling all three NPCs horizontal —
+costs three renders and loses the standing silhouettes that carry their build.
 
 ## Judging this batch
 

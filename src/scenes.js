@@ -33,7 +33,7 @@ function newDailyRand() { return mulberry32(hashStr(dailyKey())); }
 // Preloaded background art (Midjourney-derived, served from ./assets/ by serve.py).
 // Scenes draw these when loaded and fall back to procedural rendering until then.
 const IMG = {};
-function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=17'; IMG[key] = i; }
+function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=18'; IMG[key] = i; }
 function imgReady(key) { const i = IMG[key]; return i && i.complete && i.naturalWidth > 0; }
 loadImg('title', 'title.png');
 loadImg('select', 'select.png');
@@ -112,14 +112,15 @@ const NPC_LOOKS = {
     { id: 'n3', rules: surferGear(0, 0.05) },     // grey trunks
   ],
 };
-// Generated NPC lineup frames — uncomment as each lands (see SPRITE_PROMPTS.md § NPC batch).
-// Until then every identity is the shared frame recoloured, so the crowd already varies.
-// loadImg('sp_b_sit_n1', 'spr_b_sit_n1.png');
-// loadImg('sp_b_sit_n2', 'spr_b_sit_n2.png');
-// loadImg('sp_b_sit_n3', 'spr_b_sit_n3.png');
-// loadImg('sp_s_tread_n1', 'spr_s_tread_n1.png');
-// loadImg('sp_s_tread_n2', 'spr_s_tread_n2.png');
-// loadImg('sp_s_tread_n3', 'spr_s_tread_n3.png');
+// Generated NPC lineup frames. Each carries its identity's build and gear, so the sit
+// pose uses the art directly and skips the recolour (see localKey). The other three poses
+// are still the shared frame recoloured to match.
+loadImg('sp_b_sit_n1', 'spr_b_sit_n1.png');
+loadImg('sp_b_sit_n2', 'spr_b_sit_n2.png');
+loadImg('sp_b_sit_n3', 'spr_b_sit_n3.png');
+loadImg('sp_s_tread_n1', 'spr_s_tread_n1.png');
+loadImg('sp_s_tread_n2', 'spr_s_tread_n2.png');
+loadImg('sp_s_tread_n3', 'spr_s_tread_n3.png');
 
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
