@@ -13,10 +13,9 @@
 > | ~~9~~ | ~~`spr_s_tread`~~ | ✅ generated and installed 2026-07-27 |
 > | ~~10~~ | ~~`spr_s_drop`~~ | ✅ generated and installed 2026-07-27 |
 >
-> **The game is no longer missing any art.** One re-roll is pending, not a missing file:
-> **prompt 9 v2** — the player's own `spr_s_tread` is horizontal while the three NPC
-> bodysurfers are upright, so a bodysurfer lineup has the locals standing and you floating.
-> One render fixes it.
+> **The game is not missing any art, and nothing is pending.** Prompt 9 v2 landed
+> 2026-07-31: the player's tread frame is upright now, so a bodysurfer lineup reads as four
+> people treading at the same scale instead of the locals standing while you float.
 >
 > Nothing else in the game is missing art: every other `loadImg` resolves to a file in
 > `assets/`, and every file in `assets/` is used.
@@ -432,6 +431,13 @@ the figure, something scenic is touching the frame edge.
 >
 > **Paste `assets/spr_s_tread_n1.png` in as a reference image** and ask for the same pose
 > and framing — that's the cheapest way to match a set that already exists.
+>
+> ✅ **v2 worked first try** (2026-07-31) — vertical body, legs and fins hanging below,
+> arms sculling. Installed at 28×36, alongside the NPC treads at 20×36 / 20×36 / 34×36.
+> Converted with `--key-at 800,340,72 --scale 0.487`; this render draws the water as a
+> narrow **band across his chest** rather than a filled field, so one key on the band was
+> the whole job — no crop needed. Horizontal v1 archived at
+> `art-src/spr_s_tread_v2_horizontal.{jpg,png}`.
 
 #### v2 — use this one
 
