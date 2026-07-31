@@ -13,10 +13,10 @@
 > | ~~9~~ | ~~`spr_s_tread`~~ | ✅ generated and installed 2026-07-27 |
 > | ~~10~~ | ~~`spr_s_drop`~~ | ✅ generated and installed 2026-07-27 |
 >
-> **The game is no longer missing any art.** One open question, not a missing file: the
-> three NPC bodysurfers came back **upright**, as asked, while the player's own
-> `spr_s_tread` came back **horizontal** and was kept — so in a bodysurfer lineup the
-> locals stand and you float. See *Conversion notes* at the bottom of the NPC batch.
+> **The game is no longer missing any art.** One re-roll is pending, not a missing file:
+> **prompt 9 v2** — the player's own `spr_s_tread` is horizontal while the three NPC
+> bodysurfers are upright, so a bodysurfer lineup has the locals standing and you floating.
+> One render fixes it.
 >
 > Nothing else in the game is missing art: every other `loadImg` resolves to a file in
 > `assets/`, and every file in `assets/` is used.
@@ -418,12 +418,47 @@ painted across the sea. The drop frame's spray plume ran off the bottom-left cor
 padded the bbox the same way. Watch for both: if `--report` gives a width far larger than
 the figure, something scenic is touching the frame edge.
 
-Note the tread pose came back **horizontal** — floating prone, whole body visible through
-the water — rather than the upright "head and shoulders clear" the prompt asked for. It
-reads well in the lineup (they look like bodysurfers waiting, not swimmers standing up), so
-it was kept. If you ever re-roll it, that's the line to make more forceful.
-
 ### 9 — `spr_s_tread.png` · treading in the lineup
+
+> **v1 came back horizontal** — floating prone, whole body seen through the water — despite
+> asking for upright. It was kept at the time because it read well on its own, but once the
+> three NPC bodysurfers landed *upright*, the lineup ended up with the locals standing and
+> the player floating. **Use v2.**
+>
+> The fix isn't repeating the word "upright" — S1–S3 used near-identical wording and came
+> back standing, so the original was partly unlucky. The lever the old prompt never pulled
+> is **the legs**: describing them hanging vertically leaves no room for a prone body.
+> Belt and braces, `lying flat`, `prone`, `horizontal` and `swimming` go in the negatives.
+>
+> **Paste `assets/spr_s_tread_n1.png` in as a reference image** and ask for the same pose
+> and framing — that's the cheapest way to match a set that already exists.
+
+#### v2 — use this one
+
+```
+8-bit pixel art game sprite of a 1980s bodysurfer treading water in the lineup waiting for
+a wave, body VERTICAL and upright in the water like a person standing, legs hanging
+straight down below him with knees slightly bent, short dark swim fins pointing down at the
+end of his legs, submerged to mid-chest with his head and shoulders clear of the surface,
+both arms out sculling along the waterline, chin up watching the horizon, average athletic
+build, dark hair, brown skin, teal trunks, calm flat water line across his chest, NES video
+game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing,
+no gradients, single figure, side view facing RIGHT, centered on a plain solid magenta
+background for easy cutout --ar 1:1 --no lying flat, prone, horizontal, swimming, diving,
+photorealism, blur, smooth shading, standing surfer, surfboard, bodyboard, handplane,
+multiple figures, grid, reference sheet, text, watermark
+```
+
+**Judge it on one thing before anything else:** stand it next to `spr_s_tread_n1.png`. If
+the body isn't vertical with the legs below it, re-roll — everything else about the render
+is negotiable, that isn't.
+
+Converting it will most likely need `--key-at`, because the NPC batch showed Gemini paints
+the sea as a **second opaque field** rather than magenta. Probe the water and the surface
+highlight, then follow the recipe in *Conversion notes* below. It overwrites
+`assets/spr_s_tread.png`; no `loadImg` line to touch.
+
+<details><summary>v1 — the horizontal original, for the record</summary>
 
 ```
 8-bit pixel art game sprite of a 1980s bodysurfer treading water upright in the lineup
@@ -437,6 +472,8 @@ a plain solid magenta background for easy cutout --ar 1:1 --no photorealism, blu
 shading, standing surfer, surfboard, bodyboard, handplane, multiple figures, grid,
 reference sheet, text, watermark
 ```
+
+</details>
 
 ### 10 — `spr_s_drop.png` · stroking into the drop
 
