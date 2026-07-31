@@ -48,7 +48,7 @@ A white box shows where the game thinks your finger is.
 |---|---|---|
 | **High** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
 | **Middle** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
-| **Low** (in the trough), **hold it** | KNEE DROP + hand drag | LAY-BACK, arm spread |
+| **Low** (in the trough), **hold 1s** | KNEE DROP + hand drag | LAY-BACK, arm spread |
 
 Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
@@ -56,6 +56,12 @@ Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 The bodysurfer never leaves the water: where the boarder goes over the lip, he goes under
 it. Same bargain either way — you're out of your own hands for a beat while the channel
 keeps wandering, and you have to come back to it.
+
+The held stance is the one that asks for commitment: you have to stay **set in the lean for a
+full second** before it counts, and letting go early — or slipping out of the pocket mid-hold
+— forfeits the whole thing. A meter fills above the rider and flashes SET when it takes.
+Locking it in pays a bonus on top of what the lean earns per second, so a long one is worth
+holding.
 
 Tricks are the main way you score. Linking them without losing the pocket builds a
 **chain multiplier** (up to 2.4×) on top of the wave streak. You can't steer mid-trick and

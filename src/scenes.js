@@ -144,6 +144,11 @@ const TRICKS = {
 // Every trick but the air runs 25% longer than it used to — the move draws out, and the
 // break eats that time back in ground (see foamCreep in updateRide).
 const TRICK_SLOW = 1.25;
+// A held stance (LAY-BACK / KNEE DROP) has to be SET for this long before it counts at
+// all — let go sooner and you get nothing. Locking it in pays STANCE_LOCK on top of the
+// 240/s the lean earns, because holding it is the risky part, not extending it.
+const STANCE_MIN = 1.0;
+const STANCE_LOCK = 400;
 // Committing isn't quite final: press again inside this many seconds and you pull back
 // off the wave. Works on every wave — snakes, closeouts, bombs, and ones you simply had
 // second thoughts about (see startPullback).
@@ -893,7 +898,7 @@ export function makeScenes(game) {
       this.trickT = 0; this.trickDur = 0; this.trickCd = 0;
       this.foamCreep = 0;             // ground the break claws back during a slow trick
       this.airFrom = 0; this.airH = 42 + game.stage * 4;
-      this.stanceScore = 0; this.holdTouchT = 0;
+      this.stanceScore = 0; this.stanceLocked = false; this.holdTouchT = 0;
       this.chain = 0;                 // tricks linked without losing the pocket
       this.trickCount = 0;
       this.bombRide = false;          // set true by rideBomb() — doubles the exit bonus
@@ -1132,6 +1137,7 @@ export function makeScenes(game) {
         : kind === 'spin' ? spinBase * TRICK_SLOW : 0;   // stance runs while held
       this.airFrom = this.py;
       this.stanceScore = 0;
+      this.stanceLocked = false;
       if (kind === 'air') audio.tone(300, 0.45, { type: 'square', slide: 430, vol: 0.09 });
       else if (kind === 'tube') audio.tone(150, 0.7, { type: 'triangle', slide: -60, vol: 0.09 });
       else if (kind === 'spin') audio.tone(520, 0.4, { type: 'square', slide: 320, vol: 0.08 });
@@ -1198,20 +1204,22 @@ export function makeScenes(game) {
         }
         return false;   // passive drift still applies — a greedy spin can bury you
       }
-      // stance: held, scores per second, ends on release or when you slip out of the pocket
+      // stance: held, and it only counts once you've been SET in the lean for STANCE_MIN.
+      // The points are banked at the end rather than frame by frame, so letting go early —
+      // or slipping out of the band — forfeits the whole thing. That's the commitment: a
+      // second leaning against the face is a second you're steering at half rate while the
+      // channel keeps wandering under you.
       this.trickT += dt;
       const holding = input.held('a') || (input.touch.active && !input.touch.dragging);
       const inBand = Math.abs(this.py - this.pocketY()) <= this.band;
       if (holding && inBand) {
-        const g = 240 * dt * streakMult() * this.chainMult();
-        game.score += g; this.stanceScore += g;
-      } else {
-        if (this.trickT >= 0.45 * TRICK_SLOW && this.stanceScore > 0) {
-          this.chain++; this.trickCount++;
-          this.floaters.push({ txt: `${this.trickName('stance')} +${Math.round(this.stanceScore)}`,
-            x: Math.min(210, this.pocketX()), y: this.py - 22, t: 1.5 });
-          audio.trick();
+        this.stanceScore += 240 * dt;         // raw — multipliers are applied when it banks
+        if (!this.stanceLocked && this.trickT >= STANCE_MIN) {
+          this.stanceLocked = true;           // it's yours now; keep leaning for more
+          audio.tone(660, 0.12, { type: 'square', vol: 0.07 });
         }
+      } else {
+        if (this.stanceLocked) this.awardTrick(this.stanceScore + STANCE_LOCK, this.trickName('stance'));
         this.trickKind = null; this.trickCd = 0.3;
       }
       return false;
@@ -2201,6 +2209,17 @@ export function makeScenes(game) {
           ctx.fillRect(Math.round(pkX - 6 - i * 5),
             Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10 / TRICK_SLOW) * 2), 3, 2);
         }
+        // Hold meter. Letting go before it fills forfeits the lean entirely, so the player
+        // has to be able to see it coming — bar while it fills, brief SET when it locks.
+        const by = Math.round(this.py - 17);
+        if (!this.stanceLocked) {
+          const u = Math.min(1, this.trickT / STANCE_MIN);
+          ctx.fillStyle = '#181828'; ctx.fillRect(pkX - 11, by, 22, 3);
+          ctx.fillStyle = u < 1 ? '#f8d848' : '#48d048';
+          ctx.fillRect(pkX - 11, by, Math.round(u * 22), 3);
+        } else if (this.trickT - STANCE_MIN < 0.4) {
+          text(ctx, 'SET', pkX, by - 3, 8, '#48d048', 'center');
+        }
       } else if (!drawRiderImg(ctx, riderKey('ride'), pkX, this.py)) {
         drawMap(ctx, spr().ride, pkX - 10, this.py - 6, 2, true);
       }
@@ -2234,8 +2253,8 @@ export function makeScenes(game) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
         // same three zones for both riders, different moves in the top one
         const hint = game.rider === 'surfer'
-          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK' : 'X — HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK')
-          : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW=DRAG' : 'X — HIGH=AIR · MID=SPIN · HOLD LOW=DRAG');
+          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW 1s=LAY-BACK' : 'X — HIGH=TUBE · MID=ROLL · HOLD LOW 1s=LAY-BACK')
+          : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW 1s=DRAG' : 'X — HIGH=AIR · MID=SPIN · HOLD LOW 1s=DRAG');
         text(ctx, hint, W / 2, 225, 7, '#8ce8a0', 'center');
       } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
         text(ctx, this.py > pyT ? 'GO UP ↑' : 'GO DOWN ↓', W / 2, 224, 9, '#f85838', 'center');
