@@ -250,7 +250,7 @@ other way round.
 | B3 | `spr_b_sit_n3.png` | woman, athletic | dark ponytail | brown | teal one-piece | — | **purple** board, pink fins |
 | S1 | `spr_s_tread_n1.png` | tall lanky guy | red, shaggy | freckled pale | bare chest | orange | bright blue fins |
 | S2 | `spr_s_tread_n2.png` | woman, strong shoulders | black hair in a bun | brown | magenta one-piece | — | lime fins |
-| S3 | `spr_s_tread_n3.png` | heavyset older guy | bald / shaved | deep tan | black wetsuit top | grey | orange fins |
+| S3 | `spr_s_tread_n3.png` | heavyset older guy | bald / shaved | deep tan | black wetsuit top | grey | orange fins *(shipped render has yellow)* |
 
 Boarders sit **on** the board in the lineup; bodysurfers tread water with just head and
 shoulders clear. Everything faces **RIGHT**, same as the rest of the set.
@@ -503,9 +503,15 @@ resolutions (80, 100, and none) and wildly different zoom — S3 fills his whole
 a small figure in a big one. Pick the scale from the measured bbox to land ~36 px tall, next
 to `spr_b_sit.png` at 36. Don't assume the house factor carries over.
 
-**Two cosmetic compromises, both accepted:** S2 and S3 are clipped by the bottom frame edge,
-so their fins are cut short; and S3 is drawn so zoomed that he's the bulkiest of the set by
-some margin, which happens to suit him.
+**S3 was re-rolled 2026-07-29** — the first render was drawn so zoomed that he dwarfed the
+other two and his fins were clipped by the frame edge. The replacement (`--key-at 215,700
+--key-at 215,433,72 --scale 0.655`) is leaner, complete, and sits properly beside S1 and S2.
+First version archived at `art-src/spr_s_tread_n3_v1.jpg`. Note his fins came back **yellow**
+rather than the table's orange; left as-is, since the fins are recoloured to grey in his
+three motion poses anyway and only the lineup frame shows them.
+
+**One cosmetic compromise, accepted:** S2 is clipped by the bottom frame edge, so her fins
+are cut a little short.
 
 ### ⚠️ Open: the bodysurfer lineup mixes poses
 
