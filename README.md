@@ -52,7 +52,7 @@ height between the lines — so at every point on the wave you have a choice of 
 |---|---|---|
 | **X, high** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
 | **X, anywhere else** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
-| **Z, any height** | KNEE DROP + hand drag | LAY-BACK, arm spread |
+| **Z, any height** | KNEE DROP + hand drag | LAY-BACK, arm spread — **the ride drops to half speed** |
 
 Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
@@ -73,6 +73,14 @@ or slip out of the pocket before it locks, and you forfeit every point it had ea
 fills above the rider and flashes SET when it takes, and after that a running tally shows what's
 riding on it. Locking it in pays a bonus on top of what the lean earns per second, and once
 locked the pot is yours — losing the pocket from there banks it rather than burning it.
+
+The **bodysurfer's** lay-back does something the boarder's knee drop doesn't: the whole ride
+drops into **slow motion** for as long as he holds it — water, wandering pocket, buried meter
+and ride clock all at half speed — and he throws a widening **wake** off his trailing hip that
+opens up the longer he stays down. Because the entire timebase scales together, it isn't a
+scoring edge: the wave still ends after the same amount of ride time and the lean pays exactly
+what it always did. What you buy is room to read the channel. (It also means the one-second
+lock takes two real seconds to fill.)
 
 On touch there's no second button, so a finger parked down without dragging is the toggle.
 

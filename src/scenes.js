@@ -607,7 +607,16 @@ export function makeScenes(game) {
 
     // ---------------- update
     update(dt) {
-      this.animT += dt;
+      // The bodysurfer's LAY-BACK drops the ride into slow motion for as long as he holds
+      // it. Scaling the ride's whole timebase — not just the art — is what makes it read
+      // as bullet time: the water, the wandering pocket, the buried meter and the ride
+      // clock all halve together, so the wave still ends after the same amount of ride
+      // time and nothing about the scoring shifts. Only the wall clock stretches.
+      // Boarder's KNEE DROP is unaffected; buying time is the bodysurfer's edge.
+      const slow = this.mode === 'ride' && this.trickKind === 'stance' && game.rider === 'surfer';
+      const rdt = slow ? dt * 0.5 : dt;
+      this.animT += rdt;
+      // banners and floaters are HUD, not the ride — they stay on real time
       if (this.msgT > 0) this.msgT -= dt;
       for (const f of this.floaters) { f.t -= dt; f.y -= 14 * dt; }
       this.floaters = this.floaters.filter((f) => f.t > 0);
@@ -616,7 +625,7 @@ export function makeScenes(game) {
       const m = this.mode;
       if (m === 'watch') this.updateWatch(dt);
       else if (m === 'npc') this.updateNpc(dt);
-      else if (m === 'ride') this.updateRide(dt);
+      else if (m === 'ride') this.updateRide(rdt);
       else if (m === 'exit') this.updateExit(dt);
       else if (m === 'pullback') this.updatePullback(dt);
       else this.updatePitch(dt);
@@ -2258,10 +2267,36 @@ export function makeScenes(game) {
           drawMap(ctx, spr().ride, -16, -5, 2, true);
           ctx.restore();
         }
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        for (let i = 0; i < 9; i++) {
-          ctx.fillRect(Math.round(pkX - 6 - i * 5),
-            Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10 / TRICK_SLOW) * 2), 3, 2);
+        if (game.rider === 'surfer') {
+          // He's in the water, not on top of it, so the lay-back throws a real wake rather
+          // than a spray line: two foam trails diverging off his trailing hip, opening into
+          // a V and dimming as they run back down the line. It widens the longer he holds —
+          // the further he's leaned in, the more water he's pushing. animT is already
+          // running at half speed here, so the wake churns in slow motion with everything else.
+          // The whitewater is right on his tail while he's down (foamCreep), so a white-on-
+          // white wake would vanish into it: the trough does the reading here and the foam
+          // only crests the near arms. It slopes away down the face too, which keeps it from
+          // being mistaken for the dashed pocket lines running flat across the screen.
+          const grow = Math.min(1, this.trickT / 1.6);
+          const hip = this.py + 8;
+          for (let i = 0; i < 9; i++) {
+            const d = 2 + i * 4;                                // distance back along the wake
+            const sp = 1.5 + d * (0.19 + grow * 0.12);          // the V opening up behind him
+            const cy = hip + d * 0.22 + Math.sin(i * 0.8 + this.animT * 6) * 1.2;
+            ctx.fillStyle = `rgba(24,76,116,${(0.5 - i * 0.045).toFixed(2)})`;   // water shoved aside
+            ctx.fillRect(Math.round(pkX - 6 - d), Math.round(cy - sp), 4, Math.round(sp * 2));
+            if (i < 6) {                                        // foam piled on each arm
+              ctx.fillStyle = `rgba(255,255,255,${(0.95 - i * 0.11).toFixed(2)})`;
+              ctx.fillRect(Math.round(pkX - 6 - d), Math.round(cy - sp), 4, 2);
+              ctx.fillRect(Math.round(pkX - 6 - d), Math.round(cy + sp), 4, 2);
+            }
+          }
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          for (let i = 0; i < 9; i++) {
+            ctx.fillRect(Math.round(pkX - 6 - i * 5),
+              Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10 / TRICK_SLOW) * 2), 3, 2);
+          }
         }
         // Hold meter. Standing up before it fills forfeits the lean entirely, so the player
         // has to be able to see it coming — bar while it fills, brief SET when it locks.
