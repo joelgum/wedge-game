@@ -140,6 +140,44 @@ stance, and drops off again once you're trimming. It still can't overtake you.
   boiling churn where it's turning over right now, white tumbling whitewater behind. It
   never overtakes you — losing the pocket is still the only thing that ends a ride.
 
+## Audio
+
+On top of the WebAudio chiptune synth there's a **real-audio layer**: voice callouts from
+the lineup, a continuous ocean bed, and actual water on the impacts.
+
+| Cue | When |
+|---|---|
+| **"Out da back!"** | a monster appears on the horizon |
+| **whistle** | a local swings deep and claims the wave — the warning |
+| **whistle + "Hey! Hey!"** | you take off on it anyway |
+| **"Over the falls!"** | you (or an NPC) get pitched, called just after the crash lands |
+| **hoot** | an IN THE SLOT drop, and rides worth hooting at (a bomb, real tube time, 2+ tricks) |
+| **crash** | a closeout breaking, the lip detonating, a wipeout |
+| **wash** | a wave standing up, a makeable one passing you by |
+| **ocean bed** | always — swelling with the wave, loudest inside the tube |
+
+Voice lines **duck the chiptune to 35%** for their length, because the melody sits in the
+same range as a shout and without it you hear that somebody spoke rather than what they said.
+
+Everything is **strictly additive**: each clip is optional, and if a file fails to load the
+game falls straight back to the chiptune version of that cue. Nothing waits on the network.
+Total payload is **136 KB** (mono 22.05kHz mp3).
+
+### Replacing the voices
+
+The four voice clips are placeholders — macOS `say` pushed through a "shouted across the
+water" chain (band-limited, compressed, slap-delayed) to sit the synthetic artefacts under the
+processing. **To replace one with a real recording, drop your file at the same path**; the game
+loads by filename and does not care how the file was made.
+
+```sh
+python3 execution/wedge_game_audio.py --list      # what each clip is and who says it
+python3 execution/wedge_game_audio.py voice_hey   # rebuild just one
+```
+
+The whole set is generated locally from `say` + `ffmpeg` — no API keys, no downloaded samples,
+no licensing to track.
+
 ## v2 gameplay revision (2026-07-03)
 
 The original paddle-out / takeoff / ride phases were replaced with a single continuous

@@ -1,7 +1,7 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
 import { input } from './input.js?v=4';
-import { audio } from './audio.js?v=4';
+import { audio } from './audio.js?v=5';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
 import { mulberry32, hashStr } from './rng.js?v=1';
@@ -342,7 +342,8 @@ export function makeScenes(game) {
   // ---------------------------------------------------------------- TITLE
   const title = {
     t: 0,
-    enter() { this.t = 0; this.menu = 0; audio.stopMusic(); },
+    // the bed keeps running under the menus — you're on the sand, not in a void
+    enter() { this.t = 0; this.menu = 0; audio.stopMusic(); audio.ambient(0.09); },
     // ARCADE = endless seeded-by-Math.random run; DAILY WAVE = today's shared 10-wave seed
     startMode(pick) {
       audio.ensure(); audio.select();
@@ -615,6 +616,16 @@ export function makeScenes(game) {
       // The bodysurfer goes deepest (0.5×, on both his lean and his roll); the boarder's
       // knee drop is a lighter 0.7×, so buying time is still more the surfer's game.
       const rdt = dt * (this.mode === 'ride' ? this.rideRate() : 1);
+      // The ocean bed sits under everything and swells with what's in front of you: quiet
+      // in the lineup, rising as the wave stands up, loudest with your head inside it.
+      // It's one continuous loop — this only moves its level (see audio.ambient).
+      audio.ambient(
+        this.mode === 'ride' ? 0.34
+        : this.mode === 'pitch' ? 0.42
+        : this.mode === 'exit' || this.mode === 'pullback' ? 0.26
+        : this.mode === 'replay' || this.mode === 'replayPrompt' ? 0.14
+        : 0.10 + Math.min(1, this.q()) * 0.16,     // watch/npc — builds with the wave
+      );
       this.animT += rdt;
       // banners and floaters are HUD, not the ride — they stay on real time
       if (this.msgT > 0) this.msgT -= dt;
@@ -686,6 +697,9 @@ export function makeScenes(game) {
         if (!this.snake.called) {
           this.snake.called = true;
           this.say('HE\'S DEEPER — HIS WAVE', 'RIGHT OF WAY  ·  LET HIM HAVE IT', 1.8);
+          // he calls you off before you've done anything wrong — the whistle here is the
+          // warning. Taking the wave anyway gets the shout as well (see the commit path).
+          audio.play('whistle');
         }
       }
       // the ocean announces the wave standing up — a rideable BOMB rumbles early (Phase 4),
@@ -694,6 +708,8 @@ export function makeScenes(game) {
         this.rumbled = true;
         audio.tone(55, 0.9, { type: 'triangle', vol: 0.1, slide: 30 });
         audio.noise(0.7, { vol: 0.05 });
+        // real water under the synth rumble — pitched down so it reads as mass, not spray
+        audio.wash({ vol: 0.9, rate: 0.8 });
       }
       // "OUT DA BACK!" — somebody spots the set while it's still a line on the horizon,
       // which is why it fires at the very top of the build rather than as it lands. That
@@ -704,7 +720,8 @@ export function makeScenes(game) {
       if (!this.calledBig && w.monster && w.t >= 0.3) {
         this.calledBig = true;
         this.say('OUT DA BACK!', 'BIG SET ON THE HORIZON', 1.6, true);
-        audio.tone(300, 0.5, { type: 'square', slide: -150, vol: 0.08 });
+        // an actual voice if the clip is there, the old horn if it isn't
+        audio.say('outdaback', () => audio.tone(300, 0.5, { type: 'square', slide: -150, vol: 0.08 }));
       }
       if (!this.committed) {
         const prevPx = this.px;
@@ -737,6 +754,10 @@ export function makeScenes(game) {
       // window; a fatal one hangs the wave on you until the last of it runs out.
       if (this.committed && this.pullT > 0 && this.fatalRead(d, tol)) return;
       if (!this.committed) {
+        // a wave you let go still breaks — and a closeout breaks all at once, which is the
+        // whole reason you let it go. Hearing that land is the reward for the read.
+        if (!w.makeable) audio.crash();
+        else audio.wash({ vol: 0.8 });
         // letting waves go never touches the streak (GOOD CALL / WAVE WASTED)
         if (this.snake) { game.score += 150; audio.select(); this.yieldWave('GOOD CALL', 'HIS WAVE — YOU LET HIM HAVE IT  +150'); }
         else if (w.monster) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
@@ -752,12 +773,17 @@ export function makeScenes(game) {
         // his wave. Taking it earns you nothing wherever you took off from — the drop
         // bonus is for waves that were yours. Pull back during the drop or wear it.
         this.say('YOU WENT ANYWAY...', 'HE WAS ALREADY UP', 1.6);
+        // whistle first, then him yelling — in that order, because that's the order it
+        // happens in the water: the call, then the bloke you just dropped in on.
+        audio.play('whistle', { vol: 1.2 });
+        if (!audio.play('hey', { delay: 0.5 })) audio.tone(700, 0.18, { type: 'square', slide: -260, vol: 0.12 });
         this.startRide(false, 'clean');
       } else if (!w.makeable) {
         game.goto('wipeout', { reason: 'CLOSED OUT!', detail: 'THAT WAVE WAS A WALL — NO EXIT',
           mark: { px: this.px, wall: true } });
       } else if (d <= tol * 0.5) {
         this.awardDrop(800, mult, 'IN THE SLOT!');
+        audio.play('hoot', { delay: 0.25 });   // the lineup saw that one
         this.startRide(false, 'slot');
         this.beginRecord('ride');   // dead-centre on the peak — worth watching back (see updateExit)
       } else if (d <= tol) {
@@ -878,6 +904,9 @@ export function makeScenes(game) {
           this.shake = 4;
           audio.crash(); audio.noise(0.6, { vol: 0.12 });
           this.say('PITCHED AND SMASHED!', 'OVER THE FALLS', 1.7);
+          // called after the crash, not over it — it's somebody watching him go, and it
+          // has to clear the detonation to be heard at all
+          audio.play('overthefalls', { delay: 0.4 });
         }
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
@@ -966,6 +995,9 @@ export function makeScenes(game) {
         this.shake = 6;
         audio.crash();
         audio.noise(0.8, { vol: 0.17 });
+        // your own wipeout gets the same call the NPC's does — except when you snaked it,
+        // where the lineup is not sympathetic and the wipeout screen does the talking
+        if (!this.pSnake) audio.play('overthefalls', { delay: 0.45 });
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
       if (this.pT >= this.pDur) {
@@ -1505,6 +1537,9 @@ export function makeScenes(game) {
         if (game.daily) game.dailyGrid.push(this.dropTier);   // 🟩/🟦/🟨
         else if (game.made % 2 === 0) game.stage = Math.min(3, game.stage + 1);
         this.say('SPIT OUT!', `${this.trickCount} TRICKS · TUBE ${this.tubeTime.toFixed(1)}s  +${bonus}`, 2.6);
+        // rides they'd actually hoot at: coming out of one, and the bomb. A clean wave
+        // every time would make the crowd wallpaper.
+        if (this.isBomb || this.tubeTime > 1.2 || this.trickCount >= 2) audio.play('hoot', { delay: 0.3 });
         this.floaters.push({ txt: `+${bonus}`, x: this.pocketX(), y: this.py - 20, t: 1.4 });
         // exit cinematic: race ahead of the closing wall, then land the finishing trick
         this.mode = 'exit';
@@ -2461,6 +2496,7 @@ export function makeScenes(game) {
       if (this.free) game.freeFallUsed = true;
       else game.lives--;
       audio.crash();
+      audio.ambient(0.3);   // face down in the whitewater
     },
     update(dt) {
       this.t += dt;
@@ -2540,6 +2576,7 @@ export function makeScenes(game) {
       this.t = 0;
       audio.stopMusic();
       audio.sad();
+      audio.ambient(0.12);   // back on the sand
       this.mode = qualifies(game.score) ? 'entry' : 'table';
       this.initials = [0, 0, 0];
       this.slot = 0;
