@@ -395,7 +395,7 @@ export function makeScenes(game) {
       mk('ARCADE', W / 2 - 58, this.menu === 0);
       mk('DAILY WAVE', W / 2 + 52, this.menu === 1);
       text(ctx, input.usedTouch ? 'TAP A MODE TO START' : '←→ CHOOSE · X START', W / 2, 182, 7, '#fff', 'center');
-      text(ctx, 'KEYS: ←→ MOVE · X GO · ↑↓ TUBE · P PAUSE · M MUSIC', W / 2, 198, 7, '#e8e8e8', 'center');
+      text(ctx, 'KEYS: ←→ MOVE · X GO · ↑↓ TUBE · Z STANCE · P PAUSE · M MUSIC', W / 2, 198, 7, '#e8e8e8', 'center');
       text(ctx, 'TOUCH: DRAG TO MOVE · TAP TO GO', W / 2, 207, 7, '#e8e8e8', 'center');
       const hs = loadScores();
       text(ctx, `HI ${String(hs.length ? hs[0].score : 0).padStart(6, '0')} ${hs.length ? hs[0].initials : '---'}`, W / 2, 216, 8, '#f8d848', 'center');
@@ -555,6 +555,7 @@ export function makeScenes(game) {
       this.pullT = 0;           // seconds left to change your mind (see startPullback)
       this.pendingAward = 0;    // points banked on this wave that a pull back gives back
       this.rumbled = false;
+      this.calledBig = false;   // the OUT DA BACK! shout fires once per monster
       this.holdT = 0;   // brief peak-drift freeze while a teaching callout is up (Phase 1)
       this.moveT = 0;           // >0 while repositioning, so the rider shows prone (not sitting)
       this.isBomb = false;      // set true when you commit to a monster — drives the instant replay
@@ -681,6 +682,16 @@ export function makeScenes(game) {
         audio.tone(55, 0.9, { type: 'triangle', vol: 0.1, slide: 30 });
         audio.noise(0.7, { vol: 0.05 });
       }
+      // "OUT DA BACK!" — the lineup calling a set that's stacking up too big. It comes
+      // LATE on purpose: the size is the whole read on a monster, so the shout confirms
+      // what you should already have seen rather than deciding it for you. Deliberately
+      // worded the same on the makeable bomb — the early rumble is that one's tell, and
+      // a callout that named it would hand the read over for free.
+      if (!this.calledBig && w.monster && w.T - w.t <= 1.5) {
+        this.calledBig = true;
+        this.say('OUT DA BACK!', 'BIG SET STACKING UP', 1.6);
+        audio.tone(300, 0.5, { type: 'square', slide: -150, vol: 0.08 });
+      }
       if (!this.committed) {
         const prevPx = this.px;
         if (input.held('left')) this.px -= 85 * dt;
@@ -734,6 +745,7 @@ export function makeScenes(game) {
       } else if (d <= tol * 0.5) {
         this.awardDrop(800, mult, 'IN THE SLOT!');
         this.startRide(false, 'slot');
+        this.beginRecord('ride');   // dead-centre on the peak — worth watching back (see updateExit)
       } else if (d <= tol) {
         this.awardDrop(500, mult, 'CLEAN DROP');
         this.startRide(false, 'clean');
@@ -847,7 +859,7 @@ export function makeScenes(game) {
         this.nDone = true;
         if (this.nMake) {
           audio.select();
-          this.say('MADE IT!', 'THE SMALL ONES RUN', 1.7);
+          this.say('MADE IT!', 'DON\'T SLEEP ON THE SMEDIUMS', 1.7);
         } else {
           this.shake = 4;
           audio.crash(); audio.noise(0.6, { vol: 0.12 });
@@ -1204,25 +1216,33 @@ export function makeScenes(game) {
         }
         return false;   // passive drift still applies — a greedy spin can bury you
       }
-      // stance: held, and it only counts once you've been SET in the lean for STANCE_MIN.
-      // The points are banked at the end rather than frame by frame, so letting go early —
-      // or slipping out of the band — forfeits the whole thing. That's the commitment: a
-      // second leaning against the face is a second you're steering at half rate while the
-      // channel keeps wandering under you.
+      // stance: toggled on, and he stays down in it for as long as he can hold the pocket
+      // — the whole ride, if you read the channel that well. It still only counts once
+      // you've been SET in the lean for STANCE_MIN, and the points bank at the end rather
+      // than frame by frame, so standing up early — or slipping out of the band — forfeits
+      // the whole thing. That's the commitment: the pocket wanders and you're committed to
+      // a line, so the longer you stay down the more there is to lose.
       this.trickT += dt;
-      const holding = input.held('a') || (input.touch.active && !input.touch.dragging);
       const inBand = Math.abs(this.py - this.pocketY()) <= this.band;
-      if (holding && inBand) {
+      if (inBand && !this.stanceHit) {
         this.stanceScore += 240 * dt;         // raw — multipliers are applied when it banks
         if (!this.stanceLocked && this.trickT >= STANCE_MIN) {
-          this.stanceLocked = true;           // it's yours now; keep leaning for more
+          this.stanceLocked = true;           // it's yours now; stay down for more
           audio.tone(660, 0.12, { type: 'square', vol: 0.07 });
         }
       } else {
-        if (this.stanceLocked) this.awardTrick(this.stanceScore + STANCE_LOCK, this.trickName('stance'));
-        this.trickKind = null; this.trickCd = 0.3;
+        this.endStance();                     // toggled back up, or lost the pocket
       }
       return false;
+    },
+
+    // Leave the held stance — by choice, by losing the pocket, or because the wave ran out
+    // under you. Whatever the lean earned only pays if it locked first; that's the deal.
+    endStance() {
+      if (this.trickKind !== 'stance') return;
+      if (this.stanceLocked) this.awardTrick(this.stanceScore + STANCE_LOCK, this.trickName('stance'));
+      this.trickKind = null; this.trickCd = 0.3;
+      this.stanceHit = false;    // consumed by the toggle-off, so it can't re-enter this frame
     },
 
     // ---- PULL BACK: you pressed again inside PULL_WIN and got off the wave. He rides UP
@@ -1393,27 +1413,32 @@ export function makeScenes(game) {
 
       // tricks (Phase 5): the band zone under you picks the move — see startTrick.
       if (this.trickCd > 0) this.trickCd -= dt;
-      // touch has no "hold" button, so a finger parked down without dragging is the hold
+      // The held stance gets its own button (B / Z). X was already doing commit, pull back
+      // AND the tap-tricks, so a stance you can stay in for a whole ride couldn't share it.
+      // Touch has no second button: a finger parked down without dragging is the toggle,
+      // and holdFired makes it fire once per press rather than every frame it stays down.
       if (input.touch.active && !input.touch.dragging) this.holdTouchT += dt;
-      else this.holdTouchT = 0;
+      else { this.holdTouchT = 0; this.holdFired = false; }
+      this.stanceHit = input.pressed('b');
+      if (this.holdTouchT > 0.18 && !this.holdFired) { this.holdFired = true; this.stanceHit = true; }
       const airborne = this.updateTrick(dt);
       if (!this.trickKind && this.trickCd <= 0) {
         const zone = this.trickZone();
         const tapped = input.pressed('a');
-        if (zone === 'stance' && (input.held('a') || this.holdTouchT > 0.18)) this.startTrick('stance');
-        else if (zone && tapped) this.startTrick(zone);
-        else if (!zone && tapped) this.say('GET IN THE POCKET FIRST', null, 0.8);
+        if (zone === 'stance' && this.stanceHit) this.startTrick('stance');
+        else if (zone && zone !== 'stance' && tapped) this.startTrick(zone);
+        else if (zone === 'stance' && tapped) {
+          this.say(input.usedTouch ? 'HOLD DOWN LOW TO GET SET' : 'DOWN LOW — PRESS Z', null, 0.8);
+        } else if (!zone && tapped) this.say('GET IN THE POCKET FIRST', null, 0.8);
       }
 
-      // steering: none mid-air or mid-spin; half rate while you're set in the stance
-      if (!this.trickKind) {
+      // steering: none mid-air or mid-spin. The stance now steers at FULL rate — you're
+      // meant to be able to ride it the whole way, so what limits it is reading the
+      // channel, not fighting the controls.
+      if (!this.trickKind || this.trickKind === 'stance') {
         if (input.held('up')) this.py -= 75 * dt;
         if (input.held('down')) this.py += 90 * dt;
         if (input.touch.active) this.py += input.touch.dy * 1.4;
-      } else if (this.trickKind === 'stance') {
-        if (input.held('up')) this.py -= 38 * dt;
-        if (input.held('down')) this.py += 45 * dt;
-        if (input.touch.active && input.touch.dragging) this.py += input.touch.dy * 0.7;
       }
       if (!airborne) this.py += 20 * dt;   // passive drift — the price of every trick
       input.touch.dy = 0;
@@ -1439,6 +1464,9 @@ export function makeScenes(game) {
         return;
       }
       if (this.rt >= this.rideLen) {
+        // he can now ride the stance clean to the end of the wave, so cash it before the
+        // tally — otherwise a full-length knee drop would score nothing at all
+        this.endStance();
         // made it all the way through — tube bonus + everything you landed on the way
         const bonus = Math.round((500 + Math.round(this.tubeTime * 90) + this.trickCount * 120) * streakMult());
         game.score += bonus;
@@ -1499,11 +1527,15 @@ export function makeScenes(game) {
       if (!this.exSplashed && this.exT > 0.9) { this.exSplashed = true; audio.crash(); }
       if (this.exT >= 2.9) {
         audio.jingle();
-        // a made bomb ran the full drop+ride — offer the instant replay before rolling on
-        if (this.isBomb) { this.startReplayPrompt(() => this.newWave()); return; }
         // daily grid was already recorded at ride completion; just end after wave 10
-        if (game.daily && game.wave >= 10) game.goto('dailyresult', { dateKey: dailyKey(), dayNum: dailyNum() });
-        else this.newWave();
+        const after = () => {
+          if (game.daily && game.wave >= 10) game.goto('dailyresult', { dateKey: dailyKey(), dayNum: dailyNum() });
+          else this.newWave();
+        };
+        // The replay is only ever offered on a ride you COMPLETED — a bomb, or a drop you
+        // put dead in the slot. Wiping out mid-ride skips straight to the wipeout screen.
+        if (this.isBomb || this.dropTier === 'slot') { this.startReplayPrompt(after); return; }
+        after();
       }
     },
 
@@ -1526,6 +1558,7 @@ export function makeScenes(game) {
       this.recBuf.push(mode === 'ride'
         ? { foamX: this.foamX, foamCreep: this.foamCreep, animT: this.animT, rt: this.rt, py: this.py, dropT: this.dropT,
             trickKind: this.trickKind, trickT: this.trickT, trickDur: this.trickDur,
+            stanceLocked: this.stanceLocked, stanceScore: this.stanceScore,
             airFrom: this.airFrom, chain: this.chain, buried: this.buried, tubeTime: this.tubeTime }
         : { pT: this.pT, animT: this.animT, shake: this.shake, pSmashed: this.pSmashed });
     },
@@ -2209,8 +2242,10 @@ export function makeScenes(game) {
           ctx.fillRect(Math.round(pkX - 6 - i * 5),
             Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10 / TRICK_SLOW) * 2), 3, 2);
         }
-        // Hold meter. Letting go before it fills forfeits the lean entirely, so the player
+        // Hold meter. Standing up before it fills forfeits the lean entirely, so the player
         // has to be able to see it coming — bar while it fills, brief SET when it locks.
+        // After that it's a running tally: he can stay down the whole wave now, and a pot
+        // you can't see growing is a pot you have no reason to keep risking.
         const by = Math.round(this.py - 17);
         if (!this.stanceLocked) {
           const u = Math.min(1, this.trickT / STANCE_MIN);
@@ -2219,6 +2254,8 @@ export function makeScenes(game) {
           ctx.fillRect(pkX - 11, by, Math.round(u * 22), 3);
         } else if (this.trickT - STANCE_MIN < 0.4) {
           text(ctx, 'SET', pkX, by - 3, 8, '#48d048', 'center');
+        } else {
+          text(ctx, `${Math.round(this.stanceScore + STANCE_LOCK)}`, pkX, by - 3, 8, '#48d048', 'center');
         }
       } else if (!drawRiderImg(ctx, riderKey('ride'), pkX, this.py)) {
         drawMap(ctx, spr().ride, pkX - 10, this.py - 6, 2, true);
@@ -2253,8 +2290,8 @@ export function makeScenes(game) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
         // same three zones for both riders, different moves in the top one
         const hint = game.rider === 'surfer'
-          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW 1s=LAY-BACK' : 'X — HIGH=TUBE · MID=ROLL · HOLD LOW 1s=LAY-BACK')
-          : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW 1s=DRAG' : 'X — HIGH=AIR · MID=SPIN · HOLD LOW 1s=DRAG');
+          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK' : 'X HIGH=TUBE MID=ROLL · Z LOW=LAY-BACK')
+          : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW=KNEE DROP' : 'X HIGH=AIR MID=SPIN · Z LOW=KNEE DROP');
         text(ctx, hint, W / 2, 225, 7, '#8ce8a0', 'center');
       } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
         text(ctx, this.py > pyT ? 'GO UP ↑' : 'GO DOWN ↓', W / 2, 224, 9, '#f85838', 'center');

@@ -25,7 +25,8 @@ python3 -m http.server 8020
 |---|---|---|
 | ← → | track the shifting takeoff marker | — |
 | ↑ ↓ | — | steer to stay between the pocket lines |
-| X | commit to the wave — **press again within 1.5s to pull back off it** | trick — the move depends on where you are in the band |
+| X | commit to the wave — **press again within 1.5s to pull back off it** | tap a trick — the move depends on where you are in the band |
+| Z | — | drop into the held stance down low, and press again to stand back up |
 | Enter | start / confirm | |
 | P / M | pause / music toggle (keyboard only) | |
 
@@ -48,7 +49,7 @@ A white box shows where the game thinks your finger is.
 |---|---|---|
 | **High** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
 | **Middle** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
-| **Low** (in the trough), **hold 1s** | KNEE DROP + hand drag | LAY-BACK, arm spread |
+| **Low** (in the trough), **Z** | KNEE DROP + hand drag | LAY-BACK, arm spread |
 
 Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
@@ -57,11 +58,19 @@ The bodysurfer never leaves the water: where the boarder goes over the lip, he g
 it. Same bargain either way — you're out of your own hands for a beat while the channel
 keeps wandering, and you have to come back to it.
 
-The held stance is the one that asks for commitment: you have to stay **set in the lean for a
-full second** before it counts, and letting go early — or slipping out of the pocket mid-hold
-— forfeits the whole thing. A meter fills above the rider and flashes SET when it takes.
-Locking it in pays a bonus on top of what the lean earns per second, so a long one is worth
-holding.
+The held stance is the one that asks for commitment. It has **its own button (Z)** — X is
+already doing commit, pull back and the tap-tricks — and it's a **toggle**: press once to go
+down, press again to stand up. He'll stay down there for as long as you can hold the pocket,
+which can be the entire wave. Steering runs at full rate while he's down, so what limits it is
+reading the channel, not fighting the controls.
+
+You have to stay **set in the lean for a full second** before it counts at all: stand up sooner,
+or slip out of the pocket before it locks, and you forfeit every point it had earned. A meter
+fills above the rider and flashes SET when it takes, and after that a running tally shows what's
+riding on it. Locking it in pays a bonus on top of what the lean earns per second, and once
+locked the pot is yours — losing the pocket from there banks it rather than burning it.
+
+On touch there's no second button, so a finger parked down without dragging is the toggle.
 
 Tricks are the main way you score. Linking them without losing the pocket builds a
 **chain multiplier** (up to 2.4×) on top of the wave streak. You can't steer mid-trick and
@@ -88,6 +97,13 @@ stance, and drops off again once you're trimming. It still can't overtake you.
   shoulder — get under it and commit (X). Closer to dead-center = bigger drop bonus.
 - **Feathering across the whole crest** = closeout. Don't go — letting it pass pays +150.
   Going anyway costs a life.
+- **A wave that's simply too big** feathers like a makeable one — the size is the only tell.
+  The lineup shouts **OUT DA BACK!** in the last second and a half of the build, but that's
+  confirmation of a read you should already have made, not the read itself. One bomb a
+  session actually *is* makeable; its tell is that it rumbles early.
+- **Put a drop dead-centre on the peak** (IN THE SLOT) and you're offered an **instant replay**
+  of the whole thing at 0.5× once the ride is complete — as are the bomb waves. Wipe out
+  partway through and there's nothing to show.
 - The peak (and marker) **drifts** as the wave builds; drift speed rises with the stage.
 - In the tube the pocket **wanders** — a smooth, non-repeating channel (three sines with
   no common period + per-ride phases), drawn all the way down the line with look-ahead so
