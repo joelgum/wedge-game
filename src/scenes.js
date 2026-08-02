@@ -863,7 +863,7 @@ export function makeScenes(game) {
         } else {
           this.shake = 4;
           audio.crash(); audio.noise(0.6, { vol: 0.12 });
-          this.say('PITCHED AND SMASHED!', 'WALLS HAVE NO EXIT', 1.7);
+          this.say('PITCHED AND SMASHED!', 'OVER THE FALLS', 1.7);
         }
       }
       if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 9);
@@ -1128,12 +1128,18 @@ export function makeScenes(game) {
     BAND_VIS: 150,
 
     // ---- tricks -------------------------------------------------------------
+    // One definition of "between the lines", shared by what a trick may start from and by
+    // what keeps a held stance alive. They have to agree: a press right at the edge that
+    // opened a stance the strict band then forfeited on the same frame would be worse than
+    // no press at all. The ~15% overhang is what every trick has always had.
+    inLines() { return Math.abs(this.py - this.pocketY()) <= (this.band || 15) * 1.15; },
+    // The band position picks the X trick only — up by the lip the boarder goes over it and
+    // the bodysurfer goes under it, anywhere else it's the spin. The held stance is no
+    // longer on this map at all: Z takes it from any height between the lines.
     trickZone() {
+      if (!this.inLines()) return null;          // outside the pocket — fix that first
       const rel = (this.py - this.pocketY()) / (this.band || 15);
-      if (Math.abs(rel) > 1.15) return null;     // outside the pocket — fix that first
-      // up by the lip: the boarder goes over it, the bodysurfer goes under it
       if (rel < -0.34) return game.rider === 'surfer' ? 'tube' : 'air';
-      if (rel > 0.34) return 'stance';
       return 'spin';
     },
     trickName(kind) { return (TRICKS[game.rider] || TRICKS.boarder)[kind]; },
@@ -1216,15 +1222,16 @@ export function makeScenes(game) {
         }
         return false;   // passive drift still applies — a greedy spin can bury you
       }
-      // stance: toggled on, and he stays down in it for as long as he can hold the pocket
-      // — the whole ride, if you read the channel that well. It still only counts once
+      // stance: toggled on from ANY height between the lines, and he stays down in it for
+      // as long as he can hold the pocket — the whole ride, if you read the channel that
+      // well. Height no longer gates it, so it's the one move you can always reach; what
+      // you give up is that you're committed to a line. It still only counts once
       // you've been SET in the lean for STANCE_MIN, and the points bank at the end rather
       // than frame by frame, so standing up early — or slipping out of the band — forfeits
       // the whole thing. That's the commitment: the pocket wanders and you're committed to
       // a line, so the longer you stay down the more there is to lose.
       this.trickT += dt;
-      const inBand = Math.abs(this.py - this.pocketY()) <= this.band;
-      if (inBand && !this.stanceHit) {
+      if (this.inLines() && !this.stanceHit) {
         this.stanceScore += 240 * dt;         // raw — multipliers are applied when it banks
         if (!this.stanceLocked && this.trickT >= STANCE_MIN) {
           this.stanceLocked = true;           // it's yours now; stay down for more
@@ -1425,11 +1432,11 @@ export function makeScenes(game) {
       if (!this.trickKind && this.trickCd <= 0) {
         const zone = this.trickZone();
         const tapped = input.pressed('a');
-        if (zone === 'stance' && this.stanceHit) this.startTrick('stance');
-        else if (zone && zone !== 'stance' && tapped) this.startTrick(zone);
-        else if (zone === 'stance' && tapped) {
-          this.say(input.usedTouch ? 'HOLD DOWN LOW TO GET SET' : 'DOWN LOW — PRESS Z', null, 0.8);
-        } else if (!zone && tapped) this.say('GET IN THE POCKET FIRST', null, 0.8);
+        // Z and X are independent now: the stance goes from any height between the lines,
+        // and X still reads the band for which of its own two moves you get.
+        if (zone && this.stanceHit) this.startTrick('stance');
+        else if (zone && tapped) this.startTrick(zone);
+        else if (!zone && (tapped || this.stanceHit)) this.say('GET IN THE POCKET FIRST', null, 0.8);
       }
 
       // steering: none mid-air or mid-spin. The stance now steers at FULL rate — you're
@@ -2290,8 +2297,8 @@ export function makeScenes(game) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
         // same three zones for both riders, different moves in the top one
         const hint = game.rider === 'surfer'
-          ? (input.usedTouch ? 'TAP HIGH=TUBE · MID=ROLL · HOLD LOW=LAY-BACK' : 'X HIGH=TUBE MID=ROLL · Z LOW=LAY-BACK')
-          : (input.usedTouch ? 'TAP HIGH=AIR · MID=SPIN · HOLD LOW=KNEE DROP' : 'X HIGH=AIR MID=SPIN · Z LOW=KNEE DROP');
+          ? (input.usedTouch ? 'TAP HIGH=TUBE ELSE=ROLL · HOLD=LAY-BACK' : 'X HIGH=TUBE ELSE=ROLL · Z=LAY-BACK')
+          : (input.usedTouch ? 'TAP HIGH=AIR ELSE=SPIN · HOLD=KNEE DROP' : 'X HIGH=AIR ELSE=SPIN · Z=KNEE DROP');
         text(ctx, hint, W / 2, 225, 7, '#8ce8a0', 'center');
       } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
         text(ctx, this.py > pyT ? 'GO UP ↑' : 'GO DOWN ↓', W / 2, 224, 9, '#f85838', 'center');

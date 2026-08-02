@@ -26,7 +26,7 @@ python3 -m http.server 8020
 | ← → | track the shifting takeoff marker | — |
 | ↑ ↓ | — | steer to stay between the pocket lines |
 | X | commit to the wave — **press again within 1.5s to pull back off it** | tap a trick — the move depends on where you are in the band |
-| Z | — | drop into the held stance down low, and press again to stand back up |
+| Z | — | held stance, from any height between the lines — press again to stand back up |
 | Enter | start / confirm | |
 | P / M | pause / music toggle (keyboard only) | |
 
@@ -43,13 +43,16 @@ Touch: your finger is the controller — drag anywhere and the rider follows it
 (horizontally in the lineup, vertically in the tube). Quick tap = commit/start/confirm.
 A white box shows where the game thinks your finger is.
 
-### Tricks — one button, the band picks the move
+### Tricks — two buttons; X reads the band, Z doesn't
 
-| Where you are in the pocket band | Bodyboarder | Bodysurfer |
+**X** picks its move from where you are. **Z** is the held stance, and it goes from *any*
+height between the lines — so at every point on the wave you have a choice of two.
+
+| | Bodyboarder | Bodysurfer |
 |---|---|---|
-| **High** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
-| **Middle** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
-| **Low** (in the trough), **Z** | KNEE DROP + hand drag | LAY-BACK, arm spread |
+| **X, high** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
+| **X, anywhere else** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
+| **Z, any height** | KNEE DROP + hand drag | LAY-BACK, arm spread |
 
 Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
@@ -62,7 +65,8 @@ The held stance is the one that asks for commitment. It has **its own button (Z)
 already doing commit, pull back and the tap-tricks — and it's a **toggle**: press once to go
 down, press again to stand up. He'll stay down there for as long as you can hold the pocket,
 which can be the entire wave. Steering runs at full rate while he's down, so what limits it is
-reading the channel, not fighting the controls.
+reading the channel, not fighting the controls. Height doesn't gate it, so it's the one move
+you can always reach — the price is that you're committed to a line while the channel wanders.
 
 You have to stay **set in the lean for a full second** before it counts at all: stand up sooner,
 or slip out of the pocket before it locks, and you forfeit every point it had earned. A meter
