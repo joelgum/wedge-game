@@ -51,8 +51,8 @@ height between the lines — so at every point on the wave you have a choice of 
 | | Bodyboarder | Bodysurfer |
 |---|---|---|
 | **X, high** (up by the lip) | AIR — launch, rotate, land back in the band | SPAT OUT — pull under the curtain and come flying out |
-| **X, anywhere else** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis |
-| **Z, any height** | KNEE DROP + hand drag | LAY-BACK, arm spread — **the ride drops to half speed** |
+| **X, anywhere else** | 360 SPIN — pivots flat on the deck | 360 ROLL — rolls prone over his own long axis, **at half speed** |
+| **Z, any height** | KNEE DROP + wake, **at 0.7× speed** | LAY-BACK, arm spread — **the ride drops to half speed** |
 
 Every one of the six has its own drawn frame (`assets/spr_*`, generated from
 [SPRITE_PROMPTS.md](SPRITE_PROMPTS.md) and cut to size by `execution/pixelate_sprite.py`).
@@ -74,13 +74,27 @@ fills above the rider and flashes SET when it takes, and after that a running ta
 riding on it. Locking it in pays a bonus on top of what the lean earns per second, and once
 locked the pot is yours — losing the pocket from there banks it rather than burning it.
 
-The **bodysurfer's** lay-back does something the boarder's knee drop doesn't: the whole ride
-drops into **slow motion** for as long as he holds it — water, wandering pocket, buried meter
-and ride clock all at half speed — and he throws a widening **wake** off his trailing hip that
-opens up the longer he stays down. Because the entire timebase scales together, it isn't a
-scoring edge: the wave still ends after the same amount of ride time and the lean pays exactly
-what it always did. What you buy is room to read the channel. (It also means the one-second
-lock takes two real seconds to fill.)
+### Slow motion
+
+Three moves drop the ride into **slow motion** for as long as they last — the water, the
+wandering pocket, the buried meter and the ride clock all scale together:
+
+| Move | Rate |
+|---|---|
+| Bodysurfer LAY-BACK | 0.5× |
+| Bodysurfer 360 ROLL | 0.5× |
+| Bodyboarder KNEE DROP | 0.7× |
+
+Because the whole timebase scales at once it is **never a scoring edge**: the wave still ends
+after the same amount of ride time and every move pays exactly what it always did. What you buy
+is room to read the channel — and the bodysurfer buys more of it than the boarder, on both his
+moves. (It also means a hold meter takes correspondingly longer in real seconds to fill: two for
+the lay-back, ~1.4 for the knee drop.) The AIR and the SPAT OUT stay at full speed, as does the
+boarder's 360 SPIN.
+
+Both stances leave a **wake**. The bodysurfer is in the water rather than on it, so his opens
+into a widening V off his trailing hip; the boarder is planing, so his is a constant
+half-board-width churn track running off the tail.
 
 On touch there's no second button, so a finger parked down without dragging is the toggle.
 

@@ -607,14 +607,14 @@ export function makeScenes(game) {
 
     // ---------------- update
     update(dt) {
-      // The bodysurfer's LAY-BACK drops the ride into slow motion for as long as he holds
-      // it. Scaling the ride's whole timebase — not just the art — is what makes it read
-      // as bullet time: the water, the wandering pocket, the buried meter and the ride
-      // clock all halve together, so the wave still ends after the same amount of ride
-      // time and nothing about the scoring shifts. Only the wall clock stretches.
-      // Boarder's KNEE DROP is unaffected; buying time is the bodysurfer's edge.
-      const slow = this.mode === 'ride' && this.trickKind === 'stance' && game.rider === 'surfer';
-      const rdt = slow ? dt * 0.5 : dt;
+      // Some moves drop the ride into slow motion for as long as they last. Scaling the
+      // ride's whole timebase — not just the art — is what makes it read as bullet time:
+      // the water, the wandering pocket, the buried meter and the ride clock all scale
+      // together, so the wave still ends after the same amount of ride time and nothing
+      // about the scoring shifts. Only the wall clock stretches.
+      // The bodysurfer goes deepest (0.5×, on both his lean and his roll); the boarder's
+      // knee drop is a lighter 0.7×, so buying time is still more the surfer's game.
+      const rdt = dt * (this.mode === 'ride' ? this.rideRate() : 1);
       this.animT += rdt;
       // banners and floaters are HUD, not the ride — they stay on real time
       if (this.msgT > 0) this.msgT -= dt;
@@ -1146,6 +1146,14 @@ export function makeScenes(game) {
     // what keeps a held stance alive. They have to agree: a press right at the edge that
     // opened a stance the strict band then forfeited on the same frame would be worse than
     // no press at all. The ~15% overhang is what every trick has always had.
+    // How fast the ride's clock runs right now — see update(). 1 is normal; anything less
+    // is slow motion, and because it scales the whole ride at once it never moves the
+    // scoring. Only these three moves slow anything down.
+    rideRate() {
+      if (this.trickKind === 'stance') return game.rider === 'surfer' ? 0.5 : 0.7;
+      if (this.trickKind === 'spin' && game.rider === 'surfer') return 0.5;   // the 360 ROLL
+      return 1;
+    },
     inLines() { return Math.abs(this.py - this.pocketY()) <= (this.band || 15) * 1.15; },
     // The band position picks the X trick only — up by the lip the boarder goes over it and
     // the bodysurfer goes under it, anywhere else it's the spin. The held stance is no
@@ -2292,10 +2300,29 @@ export function makeScenes(game) {
             }
           }
         } else {
-          ctx.fillStyle = 'rgba(255,255,255,0.85)';
-          for (let i = 0; i < 9; i++) {
-            ctx.fillRect(Math.round(pkX - 6 - i * 5),
-              Math.round(this.py + 9 + Math.sin(i * 0.9 + this.animT * 10 / TRICK_SLOW) * 2), 3, 2);
+          // He's planing on a board rather than shoving water aside with his body, so the
+          // knee drop leaves a track, not a spreading V: a constant half-board-width churn
+          // (the board reads ~30px across, so 15) running back off the tail. Same trough-led
+          // build as the surfer's — the whitewater creeps up on him while he's down, and
+          // white on white wouldn't read — with foam capping both edges and churn inside.
+          // Kept short (~32px) on purpose: the foam is only a board length off his tail
+          // while he's down, and everything past that is drawn on whitewater where a wake
+          // has nothing to read against.
+          const HALF_BOARD = 15;
+          const wy = this.py + 12;                               // the board's waterline
+          for (let i = 0; i < 8; i++) {
+            const d = 4 + i * 4;                                 // distance back off the tail
+            const x = Math.round(pkX - 12 - d);
+            const cy = wy + d * 0.12 + Math.sin(i * 0.7 + this.animT * 7) * 1.1;
+            const top = Math.round(cy - HALF_BOARD / 2);
+            ctx.fillStyle = `rgba(20,68,106,${(0.55 - i * 0.05).toFixed(2)})`;
+            ctx.fillRect(x, top, 4, HALF_BOARD);
+            ctx.fillStyle = `rgba(255,255,255,${(0.95 - i * 0.09).toFixed(2)})`;
+            ctx.fillRect(x, top, 4, 2);                          // foam on the upper edge
+            ctx.fillRect(x, top + HALF_BOARD - 2, 4, 2);         // and the lower
+            if ((i + Math.floor(this.animT * 8)) % 3 === 0) {    // churn tumbling inside it
+              ctx.fillRect(x, top + 4 + ((i * 5) % (HALF_BOARD - 8)), 3, 2);
+            }
           }
         }
         // Hold meter. Standing up before it fills forfeits the lean entirely, so the player
