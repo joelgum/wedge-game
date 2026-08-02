@@ -101,10 +101,11 @@ stance, and drops off again once you're trimming. It still can't overtake you.
   shoulder — get under it and commit (X). Closer to dead-center = bigger drop bonus.
 - **Feathering across the whole crest** = closeout. Don't go — letting it pass pays +150.
   Going anyway costs a life.
-- **A wave that's simply too big** feathers like a makeable one — the size is the only tell.
-  The lineup shouts **OUT DA BACK!** in the last second and a half of the build, but that's
-  confirmation of a read you should already have made, not the read itself. One bomb a
-  session actually *is* makeable; its tell is that it rumbles early.
+- **A wave that's simply too big** feathers like a makeable one. Somebody in the lineup spots
+  it while it's still a line on the horizon and shouts **OUT DA BACK!** — right at the top of
+  the build, before the wave has stood up, so you get the whole build to decide. It's a shout
+  rather than a scoreline, so it draws smaller than the scoring banners. One bomb a session
+  actually *is* makeable and gets the same shout; its tell is that it rumbles early.
 - **Put a drop dead-centre on the peak** (IN THE SLOT) and you're offered an **instant replay**
   of the whole thing at 0.5× once the ride is complete — as are the bomb waves. Wipe out
   partway through and there's nothing to show.

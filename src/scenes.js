@@ -509,7 +509,11 @@ export function makeScenes(game) {
       audio.ensure(); audio.startMusic();
     },
 
-    say(msg, sub, secs = 1.8) { this.msg = msg; this.msgSub = sub; this.msgT = secs; },
+    // `small` is for lines that are somebody in the lineup talking rather than the game
+    // scoring you — they read at a smaller size so the hierarchy stays right (see draw).
+    say(msg, sub, secs = 1.8, small = false) {
+      this.msg = msg; this.msgSub = sub; this.msgT = secs; this.msgSmall = small;
+    },
 
     newWave() {
       game.wave++;
@@ -682,14 +686,15 @@ export function makeScenes(game) {
         audio.tone(55, 0.9, { type: 'triangle', vol: 0.1, slide: 30 });
         audio.noise(0.7, { vol: 0.05 });
       }
-      // "OUT DA BACK!" — the lineup calling a set that's stacking up too big. It comes
-      // LATE on purpose: the size is the whole read on a monster, so the shout confirms
-      // what you should already have seen rather than deciding it for you. Deliberately
-      // worded the same on the makeable bomb — the early rumble is that one's tell, and
-      // a callout that named it would hand the read over for free.
-      if (!this.calledBig && w.monster && w.T - w.t <= 1.5) {
+      // "OUT DA BACK!" — somebody spots the set while it's still a line on the horizon,
+      // which is why it fires at the very top of the build rather than as it lands. That
+      // does hand you the monster read (Joel's call): the wave hasn't stood up yet, so
+      // size can't be what you're reacting to. It's a shout, not a scoreline, so it draws
+      // small. Still worded the same on the session's makeable bomb — that one's tell is
+      // the early rumble, and naming it here would give away which bomb is on.
+      if (!this.calledBig && w.monster && w.t >= 0.3) {
         this.calledBig = true;
-        this.say('OUT DA BACK!', 'BIG SET STACKING UP', 1.6);
+        this.say('OUT DA BACK!', 'BIG SET ON THE HORIZON', 1.6, true);
         audio.tone(300, 0.5, { type: 'square', slide: -150, vol: 0.08 });
       }
       if (!this.committed) {
@@ -1676,10 +1681,19 @@ export function makeScenes(game) {
       }
       hud(ctx);
       if (this.msgT > 0 && this.msg) {
+        const sm = this.msgSmall;
+        const boxY = sm ? 54 : 52;
+        const hs = sm ? 8 : 12, ss = sm ? 7 : 8;
+        // The small variant shrinks its plate to the line as well as the type — the
+        // full-width bar around 8px text is mostly empty, and reads as a missing headline.
+        // Courier is monospace, so character count is enough to size it.
+        const boxW = sm
+          ? Math.min(200, Math.round(Math.max(this.msg.length * hs, (this.msgSub || '').length * ss) * 0.62) + 16)
+          : 200;
         ctx.fillStyle = 'rgba(8,8,32,0.55)';
-        ctx.fillRect(28, 52, 200, this.msgSub ? 30 : 20);
-        text(ctx, this.msg, W / 2, 55, 12, '#f8f890', 'center');
-        if (this.msgSub) text(ctx, this.msgSub, W / 2, 70, 8, '#fff', 'center');
+        ctx.fillRect(Math.round(W / 2 - boxW / 2), boxY, boxW, this.msgSub ? (sm ? 22 : 30) : (sm ? 14 : 20));
+        text(ctx, this.msg, W / 2, boxY + 3, hs, '#f8f890', 'center');
+        if (this.msgSub) text(ctx, this.msgSub, W / 2, boxY + (sm ? 13 : 18), ss, '#fff', 'center');
       }
     },
 
