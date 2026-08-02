@@ -23,10 +23,12 @@ const CLIPS = {
   ocean: 'amb_ocean',
 };
 
-// Per-clip trim, so levels can be balanced without re-rendering the files.
+// Per-clip trim, so levels can be balanced without re-rendering the files. Balanced by
+// measuring each clip's peak through the live mix: the voices are the point, so they sit
+// on top; a whistle is a pure tone and reads as much louder than its meter suggests.
 const CLIP_VOL = {
-  outdaback: 0.9, hey: 0.85, overthefalls: 0.9, hoot: 0.7,
-  whistle: 0.5, crash: 0.55, wash: 0.4, ocean: 1,
+  outdaback: 1.3, hey: 1.25, overthefalls: 1.35, hoot: 1.0,
+  whistle: 0.26, crash: 0.5, wash: 0.4, ocean: 1,
 };
 
 const VOICES = ['outdaback', 'hey', 'overthefalls', 'hoot'];

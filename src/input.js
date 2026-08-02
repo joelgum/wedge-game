@@ -1,6 +1,6 @@
 // Keyboard + touch input. Touch: the finger is the controller — the game reads
 // input.touch (canvas coords) for direct positional control; a quick tap = A button.
-import { audio } from './audio.js?v=5';
+import { audio } from './audio.js?v=6';
 
 // on-screen master-mute button (bottom-right corner, canvas coords). Drawn in main.js;
 // hit-tested here so a tap on it toggles audio instead of counting as the A button.

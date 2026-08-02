@@ -1,7 +1,7 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
 import { input } from './input.js?v=4';
-import { audio } from './audio.js?v=5';
+import { audio } from './audio.js?v=6';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
 import { mulberry32, hashStr } from './rng.js?v=1';
