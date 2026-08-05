@@ -613,8 +613,8 @@ export function makeScenes(game) {
       // the water, the wandering pocket, the buried meter and the ride clock all scale
       // together, so the wave still ends after the same amount of ride time and nothing
       // about the scoring shifts. Only the wall clock stretches.
-      // The bodysurfer goes deepest (0.5×, on both his lean and his roll); the boarder's
-      // knee drop is a lighter 0.7×, so buying time is still more the surfer's game.
+      // The bodysurfer goes deepest (0.7×, on both his lean and his roll); the boarder's
+      // knee drop is a lighter 0.9×, so buying time is still more the surfer's game.
       const rdt = dt * (this.mode === 'ride' ? this.rideRate() : 1);
       // The ocean bed sits under everything and swells with what's in front of you: quiet
       // in the lineup, rising as the wave stands up, loudest with your head inside it.
@@ -1180,10 +1180,12 @@ export function makeScenes(game) {
     // no press at all. The ~15% overhang is what every trick has always had.
     // How fast the ride's clock runs right now — see update(). 1 is normal; anything less
     // is slow motion, and because it scales the whole ride at once it never moves the
-    // scoring. Only these three moves slow anything down.
+    // scoring. Only these three moves slow anything down. Both of the bodysurfer's sit at
+    // the same rate — he's the one who buys time — and the boarder's knee drop is only a
+    // touch off full speed, more a settle into the move than a bullet-time beat.
     rideRate() {
-      if (this.trickKind === 'stance') return game.rider === 'surfer' ? 0.5 : 0.7;
-      if (this.trickKind === 'spin' && game.rider === 'surfer') return 0.5;   // the 360 ROLL
+      if (this.trickKind === 'stance') return game.rider === 'surfer' ? 0.7 : 0.9;
+      if (this.trickKind === 'spin' && game.rider === 'surfer') return 0.7;   // the 360 ROLL
       return 1;
     },
     inLines() { return Math.abs(this.py - this.pocketY()) <= (this.band || 15) * 1.15; },
@@ -2314,8 +2316,8 @@ export function makeScenes(game) {
           // He's in the water, not on top of it, so the lay-back throws a real wake rather
           // than a spray line: two foam trails diverging off his trailing hip, opening into
           // a V and dimming as they run back down the line. It widens the longer he holds —
-          // the further he's leaned in, the more water he's pushing. animT is already
-          // running at half speed here, so the wake churns in slow motion with everything else.
+          // the further he's leaned in, the more water he's pushing. animT is already slowed
+          // here (rideRate), so the wake churns in slow motion with everything else.
           // The whitewater is right on his tail while he's down (foamCreep), so a white-on-
           // white wake would vanish into it: the trough does the reading here and the foam
           // only crests the near arms. It slopes away down the face too, which keeps it from
