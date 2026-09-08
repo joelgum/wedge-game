@@ -30,6 +30,10 @@ python3 -m http.server 8020
 | Enter | start / confirm | |
 | P / M | pause / music toggle (keyboard only) | |
 
+The speaker in the bottom-right corner is a **master mute**, and its state persists across
+sessions — so **M also turns the sound back on** if that ever gets switched by accident.
+While it's muted the game says so in words next to the icon; there is no silent silence.
+
 ### Pull back — committing isn't final
 
 Press **X / tap a second time within 1.5 seconds** and you get off the wave: he climbs up
@@ -126,8 +130,15 @@ stance, and drops off again once you're trimming. It still can't overtake you.
 - **A wave that's simply too big** feathers like a makeable one. Somebody in the lineup spots
   it while it's still a line on the horizon and shouts **OUT DA BACK!** — right at the top of
   the build, before the wave has stood up, so you get the whole build to decide. It's a shout
-  rather than a scoreline, so it draws smaller than the scoring banners. One bomb a session
-  actually *is* makeable and gets the same shout; its tell is that it rumbles early.
+  rather than a scoreline, so it draws smaller than the scoring banners.
+- **Which big one is on: watch the SET bar.** Every wave rumbles as it stands up, and the
+  rumble drops a white tick on the SET meter where it landed. Normal waves and un-makeable
+  monsters always notch it in the same place, three-quarters along. **One bomb a session is
+  makeable, and it is the only thing in the game that rumbles early** — a tick left of the
+  usual notch is the tell, and it stays on screen for the rest of the build. The shout is
+  worded identically on both, so it tells you a monster is coming and nothing more.
+- **Letting a monster go pays +150 — unless it was the makeable one.** Sitting out the bomb
+  is a WAVE WASTED and pays nothing, so the read is worth having rather than a formality.
 - **Put a drop dead-centre on the peak** (IN THE SLOT) and you're offered an **instant replay**
   of the whole thing at 0.5× once the ride is complete — as are the bomb waves. Wipe out
   partway through and there's nothing to show.

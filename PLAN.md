@@ -35,7 +35,15 @@ Pick your rider first (bodyboarder or bodysurfer), then each "run" = one wave, p
 - **The lineup is a mixed crowd** (2026-07-26): each of the three locals rolls bodyboarder or bodysurfer at the start of a run and keeps it, whichever rider you picked — so you're always sitting with a mix. Whoever takes the interstitial NPC wave goes as whatever he is.
 - The whole skill is a **single shifting ideal takeoff spot**: the peak wanders across the face, and from Afternoon on, the wedge backwash **flips its direction once** mid-build. Slide ←→ (or drag) to stay under the marker.
 - **The tell is crest feathering:** a makeable wave feathers (spits spray) only near the peak; a closeout feathers all the way across — don't go on those.
-- A **SET meter** fills as the wave stands up; it arrives whether you're ready or not.
+- A **SET meter** fills as the wave stands up; it arrives whether you're ready or not. It is
+  also the monster read (2026-09-07): every wave rumbles as it stands, and the rumble leaves a
+  white tick on the meter where it landed. Normal waves and trap monsters always notch it at
+  ~75%; the session's one makeable bomb rumbles at ~55%, so a tick left of the usual one is
+  the tell. `OUT DA BACK!` still fires on the horizon and is worded identically on both, so it
+  is the heads-up, not the read — and passing on the makeable bomb pays nothing (WAVE WASTED)
+  where passing on a trap pays +150, which is what makes reading the tick worth anything.
+  Measured while building this: the wave's own drawn height is useless as the tell (80px at the
+  bomb's rumble vs 94px at the trap's, crest tops 2px apart), which is why it hangs off the meter.
 
 ### Commit — the timing skill
 - Press X / tap when you're under the spot. Commit is an **instant timing call**: it seals your grade where you stand and the wave breaks immediately (the marker shows only briefly — it's about *when* you commit, not tracking a moving target). Commit only counts once the wave is at least a quarter built.
@@ -126,9 +134,10 @@ Each survived wave advances the clock; palette + difficulty shift together:
     │                    #   surf = the whole game with modes watch → ride → exit
     ├── input.js         # keyboard (arrows + Z/X, P/M) + touch (relative-slide, tap = go)
     ├── sprites.js       # procedural pixel sprites (string-array maps) + drawMap; placeholder art
-    ├── audio.js         # WebAudio synth: 8-bit SFX + chiptune, mute persisted to localStorage
+    ├── audio.js         # WebAudio synth + the real-audio layer (voices, ocean bed, impacts);
+    │                    #   3 buses, mute persisted to localStorage, iOS ringer-switch workaround
     ├── score.js         # localStorage high-score table (loadScores / saveScore / qualifies)
-    └── wave.js          # DEAD CODE — early generateWave(); superseded by scenes.js newWave(). Remove.
+    └── rng.js           # mulberry32 + hashStr — the Daily Wave's seeded sequence
 ```
 
 **Key technical decisions**
@@ -254,12 +263,14 @@ retro NES game HUD elements: pixel heart life icons x3, score counter in blocky 
 | 4 | **Rider select** | ✅ Bodyboarder / bodysurfer, wired through every player draw (placeholder sprites) |
 | 5 | **Mobile controls** | ✅ Relative-slide steering (finger-as-controller) + tap-to-go; no-cache dev server for iOS |
 | 6 | **Art pass** | 🟢 Backdrops, rider frames and all **6 dedicated trick poses** are in (Gemini → `execution/pixelate_sprite.py` → `assets/`), plus a re-rolled `spr_s_prone`. Sources kept in `art-src/`. **NPC identities** wired: each local rolls one of three looks per rider type, dealt without replacement, and `recolourImg()` hue-swaps its gear onto the shared pose frames at load — so the lineup is already a crowd of distinct people with no new art. `spr_s_tread` / `spr_s_drop` regenerated 2026-07-27, so the bodysurfer is finally one character in every frame. All six NPC lineup frames generated and installed 2026-07-29, so **the game is no longer missing any art**. The player's tread frame was re-rolled upright on 2026-07-31 (prompt 9 v2), so a bodysurfer lineup now reads as four people treading at one scale rather than the locals standing while the player floats |
-| 7 | **Audio pass** | 🟡 8-bit SFX + chiptune synth working in code; could refine/mix |
-| 8 | **Polish + ship** | 🟡 High scores, pause, mute persist and touch is usable; **remaining:** deploy to a live URL (Astro route or standalone Vercel) |
+| 7 | **Audio pass** | ✅ 8-bit SFX + chiptune synth, plus a real-audio layer on top (4 voice callouts, ocean bed, water on the impacts — 136 KB, generated locally by `execution/wedge_game_audio.py`). Three buses; voices duck the music to 35%. Mix balanced by measuring peaks through the live graph. Every clip is additive and falls back to its chiptune version. The four voices are still `say`-generated placeholders — drop a real recording at the same path to replace one. 2026-09-07: master mute is recoverable from the keyboard (M) and says so on screen, and an inaudible looping element claims an iOS playback session so the ringer switch can't silence WebAudio |
+| 8 | **Polish + ship** | ✅ High scores, pause, mute persist, touch usable, **live at [wedge-game.vercel.app](https://wedge-game.vercel.app)** from the standalone `joelgum/wedge-game` repo (OG card + favicon in `assets/meta/`). Only distribution item left is the itch.io package (MARKETABILITY_PLAN Phase 5.2) |
 
 **Definition of done:** a stranger on a phone can pick it up, get pitched a few times, understand *why*, and want one more run. (Core loop is there; art + deploy are what's left.)
 
 ## 8. Open Questions (for later, not blockers)
 
 - Final title pick (§2) — "WEDGE!" is in use as the working title.
-- Whether the game ships on the Astro site (like sample-game) or a standalone Vercel repo (like traced-app). Decide at the deploy step.
+- ~~Whether the game ships on the Astro site or a standalone Vercel repo.~~ Answered: standalone
+  repo `joelgum/wedge-game` → wedge-game.vercel.app. The monorepo copy here is the source of truth;
+  deploying means syncing these files over and pushing.

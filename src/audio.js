@@ -33,6 +33,9 @@ const CLIP_VOL = {
 
 const VOICES = ['outdaback', 'hey', 'overthefalls', 'hoot'];
 
+// 25ms of silence, looped by _iosSession() below to get off the iOS ringer switch.
+const SILENCE = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YcgAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+
 class AudioSys {
   constructor() {
     try { this.musicMuted = localStorage.getItem('wedge-muted') === '1'; } catch (e) { this.musicMuted = false; }
@@ -60,6 +63,7 @@ class AudioSys {
   }
 
   ensure() {
+    this._iosSession();
     if (!this.ctx) {
       try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { /* no audio */ }
       if (this.ctx) {
@@ -72,6 +76,25 @@ class AudioSys {
       }
     }
     if (this.ctx && this.ctx.state === 'suspended' && !this.userPaused) this.ctx.resume();
+  }
+
+  // iOS mutes WebAudio with the physical ringer switch unless the page has claimed a
+  // *playback* audio session, and the only way to claim one is to play an HTMLAudioElement.
+  // So we loop 25ms of digital silence. Same trick Howler uses; strictly additive, and on
+  // every other platform it is an inaudible no-op. Volume is read-only on iOS, which is why
+  // the clip has to be genuinely silent rather than an existing asset turned down.
+  _iosSession() {
+    if (this._silent) return;
+    try {
+      const a = new Audio(SILENCE);
+      a.loop = true;
+      a.setAttribute('playsinline', '');
+      this._silent = a;
+      const r = a.play();
+      // a rejected play() means the session was never claimed, so drop the element and let
+      // the next ensure() (the next key or tap) have another go
+      if (r && r.catch) r.catch(() => { if (this._silent === a) this._silent = null; });
+    } catch (e) { this._silent = null; /* no HTMLAudioElement; WebAudio still runs */ }
   }
 
   // Fire-and-forget. A clip that 404s or fails to decode simply never appears in this.buf,

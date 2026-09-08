@@ -6,6 +6,15 @@
 > All gameplay lives in `src/scenes.js` (~1070 lines, one file: title → select → surf → wipeout → gameover).
 > Dev server: `python3 serve.py 8020` from this directory.
 
+## Status (updated 2026-09-07)
+
+Phases 1–4 are **done** and were built well past this spec (right-of-way waves, universal
+pull-back, held stances, seven trick sprites, distinct NPC identities, slow-motion tricks, a
+real audio layer). Phase 5 is **half done**: the game is live at wedge-game.vercel.app from the
+standalone `joelgum/wedge-game` repo, with OG tags and a favicon. **The only item left in this
+whole plan is 5.2, the itch.io package** — and whether that happens depends on whether Joel
+wants the audience or was building this for himself and his friends.
+
 ## Why (context from marketability review)
 
 The game is a solid one-mechanic arcade loop but has zero distribution (not deployed), no

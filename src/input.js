@@ -1,6 +1,6 @@
 // Keyboard + touch input. Touch: the finger is the controller — the game reads
 // input.touch (canvas coords) for direct positional control; a quick tap = A button.
-import { audio } from './audio.js?v=6';
+import { audio } from './audio.js?v=7';
 
 // on-screen master-mute button (bottom-right corner, canvas coords). Drawn in main.js;
 // hit-tested here so a tap on it toggles audio instead of counting as the A button.
@@ -30,7 +30,14 @@ export const input = {
 addEventListener('keydown', (e) => {
   // music toggle is handled here, not in the game loop, so it works even
   // when requestAnimationFrame is throttled while music keeps playing
-  if (e.code === 'KeyM' && !e.repeat) { audio.ensure(); audio.toggleMusic(); return; }
+  // M is also the way out of a master mute. The on-screen speaker is a small target in a
+  // corner and its state persists across sessions, so without a keyboard escape one stray
+  // tap silences the game for good — which is exactly what it did.
+  if (e.code === 'KeyM' && !e.repeat) {
+    audio.ensure();
+    if (audio.mutedAll) audio.toggleMute(); else audio.toggleMusic();
+    return;
+  }
   const k = KEYMAP[e.code];
   if (k) { e.preventDefault(); if (!e.repeat) input.press(k); audio.ensure(); }
 });

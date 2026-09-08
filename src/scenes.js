@@ -1,7 +1,7 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
-import { input } from './input.js?v=4';
-import { audio } from './audio.js?v=6';
+import { input } from './input.js?v=5';
+import { audio } from './audio.js?v=7';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
 import { mulberry32, hashStr } from './rng.js?v=1';
@@ -561,6 +561,8 @@ export function makeScenes(game) {
       this.pendingAward = 0;    // points banked on this wave that a pull back gives back
       this.rumbled = false;
       this.calledBig = false;   // the OUT DA BACK! shout fires once per monster
+      this.rumbleShake = 0;     // the monster rumble kicks the view — see updateWatch
+      this.rumbleQ = 0;         // where in the build the rumble landed; ticked on the SET bar
       this.holdT = 0;   // brief peak-drift freeze while a teaching callout is up (Phase 1)
       this.moveT = 0;           // >0 while repositioning, so the rider shows prone (not sitting)
       this.isBomb = false;      // set true when you commit to a monster — drives the instant replay
@@ -710,13 +712,28 @@ export function makeScenes(game) {
         audio.noise(0.7, { vol: 0.05 });
         // real water under the synth rumble — pitched down so it reads as mass, not spray
         audio.wash({ vol: 0.9, rate: 0.8 });
+        // Second tell (2026-09-07). OUT DA BACK! fires on the horizon where the wave is 2px
+        // tall, so it can't be the read — it's the heads-up. The read is WHEN this rumble
+        // lands, and the wave itself is useless as a reference for that: measured, the face
+        // is 80px at the bomb's rumble and 94px at the trap's, with the crest tops 2px
+        // apart. So the rumble gets marked on the SET bar instead, which is a real scale
+        // the player already reads. Every wave rumbles at 75%; the makeable bomb is the
+        // only thing in the game that rumbles at 55%, so a tick left of the usual notch is
+        // the tell — and it stays on screen for the rest of the build, rather than being a
+        // sound you either caught or didn't.
+        this.rumbleQ = this.q();
+        if (w.monster) {
+          this.rumbleShake = 3.5;
+          this.say('HEAR THAT RUMBLE?', 'MARK IT ON THE SET BAR', 1.4, true);
+        }
       }
+      if (this.rumbleShake > 0) this.rumbleShake = Math.max(0, this.rumbleShake - dt * 6);
       // "OUT DA BACK!" — somebody spots the set while it's still a line on the horizon,
-      // which is why it fires at the very top of the build rather than as it lands. That
-      // does hand you the monster read (Joel's call): the wave hasn't stood up yet, so
-      // size can't be what you're reacting to. It's a shout, not a scoreline, so it draws
-      // small. Still worded the same on the session's makeable bomb — that one's tell is
-      // the early rumble, and naming it here would give away which bomb is on.
+      // which is why it fires at the very top of the build rather than as it lands. It is
+      // the heads-up, not the read: the wave hasn't stood up yet, so size can't be what
+      // you're reacting to. The read is the rumble tick on the SET bar above. It's a shout,
+      // not a scoreline, so it draws small. Still worded the same on the session's makeable
+      // bomb — naming it here would give away which one is on.
       if (!this.calledBig && w.monster && w.t >= 0.3) {
         this.calledBig = true;
         this.say('OUT DA BACK!', 'BIG SET ON THE HORIZON', 1.6, true);
@@ -760,7 +777,11 @@ export function makeScenes(game) {
         else audio.wash({ vol: 0.8 });
         // letting waves go never touches the streak (GOOD CALL / WAVE WASTED)
         if (this.snake) { game.score += 150; audio.select(); this.yieldWave('GOOD CALL', 'HIS WAVE — YOU LET HIM HAVE IT  +150'); }
-        else if (w.monster) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
+        // Only the TRAP pays for being let go. The session's one makeable bomb was on, so
+        // sitting it out wastes it — which is what makes the rumble read worth having:
+        // before this, passing on every monster was risk-free points and the tell was decor.
+        else if (w.monster && !w.rideable) { game.score += 150; this.say('GOOD CALL', 'TOO BIG — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
+        else if (w.monster) { this.say('WAVE WASTED', 'THAT BOMB WAS MAKEABLE...'); this.recordAndAdvance('waste'); }
         else if (w.makeable) { this.say('WAVE WASTED', 'DUDE, THAT WAS THE ONE'); this.recordAndAdvance('waste'); }
         else { game.score += 150; this.say('GOOD CALL', 'CLOSEOUT — LET IT GO  +150'); audio.select(); this.recordAndAdvance('good'); }
       } else if (w.monster) {
@@ -1711,7 +1732,10 @@ export function makeScenes(game) {
       const p = pal();
       // screen shake when the wave lands on a pitched wipeout — jitter the world layer,
       // overscan the backdrop so no black edge shows, keep the HUD steady
-      const shk = ((this.mode === 'pitch' || this.mode === 'npc') && this.shake > 0) ? this.shake : 0;
+      // the monster rumble kicks the view too, so the moment it lands is impossible to
+      // miss — reuses the same overscan path as the wipeout shake
+      const shk = ((this.mode === 'pitch' || this.mode === 'npc') && this.shake > 0) ? this.shake
+        : (this.mode === 'watch' && this.rumbleShake > 0) ? this.rumbleShake : 0;
       if (shk) { ctx.save(); ctx.translate(Math.round((Math.random() * 2 - 1) * shk), Math.round((Math.random() * 2 - 1) * shk)); }
       const bgKey = BG_KEYS[game.stage];
       if (imgReady(bgKey)) {
@@ -1926,6 +1950,13 @@ export function makeScenes(game) {
       ctx.fillStyle = '#181828'; ctx.fillRect(30, 23, 60, 5);
       ctx.fillStyle = q > 0.8 ? '#f85838' : '#f8d848';
       ctx.fillRect(30, 23, Math.round(q * 60), 5);
+      // where the rumble landed, kept up for the rest of the build. Normal waves and traps
+      // always notch it in the same place; only the makeable bomb marks early. This is the
+      // monster read — the shout on the horizon is just the heads-up.
+      if (this.rumbleQ > 0) {
+        ctx.fillStyle = '#f8f8f8';
+        ctx.fillRect(30 + Math.round(this.rumbleQ * 60), 21, 2, 9);
+      }
     },
 
     // the interstitial NPC wave — same visual language as drawWatch (march-in, gradient

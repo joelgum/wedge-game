@@ -1,8 +1,8 @@
 // Boot + fixed-timestep game loop at NES-native 256x240, integer-scaled.
 // ?v= querystrings bust stale module caches on phones; bump together in all files
-import { input, MUTE_RECT } from './input.js?v=4';
-import { audio } from './audio.js?v=6';
-import { makeScenes } from './scenes.js?v=45';
+import { input, MUTE_RECT } from './input.js?v=5';
+import { audio } from './audio.js?v=7';
+import { makeScenes } from './scenes.js?v=46';
 
 const W = 256, H = 240;
 
@@ -75,6 +75,14 @@ function drawMute(ctx) {
   if (audio.mutedAll) {
     ctx.strokeStyle = '#f85838'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(bx + 8, by - 1); ctx.lineTo(bx + 15, by + 11); ctx.stroke();
+    // a red slash on a 16px icon is easy to miss, and the state outlives the session — so
+    // say it in words, and say how to undo it. This is the only label drawn over every scene.
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.font = "bold 7px 'Courier New', monospace";
+    ctx.fillStyle = '#f85838';
+    ctx.fillText('MUTED', r.x - 2, r.y + 1);
+    ctx.fillStyle = '#a8a8b8';
+    ctx.fillText('M = SOUND ON', r.x + r.w - 1, r.y - 8);
   } else {
     ctx.fillStyle = '#f8f8f8';                     // sound waves
     ctx.fillRect(bx + 13, by + 1, 1, 8);
