@@ -19,10 +19,14 @@ export const input = {
   down: {}, hit: {},
   touch: { active: false, x: 0, y: 0, dragging: false, dx: 0, dy: 0 },
   usedTouch: false,
+  // Identifies each distinct A press, keyboard or finger. Touch has one button, so commit
+  // and pull back are the same gesture; a caller that must not accept the SAME press twice
+  // compares this against the value it saw when it consumed the first one.
+  aSeq: 0,
   pressed(k) { return !!this.hit[k]; },
   held(k) { return !!this.down[k]; },
   endFrame() { this.hit = {}; },
-  press(k) { if (!this.down[k]) this.hit[k] = true; this.down[k] = true; },
+  press(k) { if (!this.down[k]) { this.hit[k] = true; if (k === 'a') this.aSeq++; } this.down[k] = true; },
   release(k) { this.down[k] = false; },
   set(k, v) { v ? this.press(k) : this.release(k); },
 };
@@ -84,14 +88,18 @@ addEventListener('touchmove', (e) => {
   }
 }, { passive: false });
 
-function touchEnd(e) {
+// cancelled === not a tap. iOS fires touchcancel whenever the system takes the gesture
+// over (edge swipe, notification shade, call banner, a stray second finger), and routing
+// that through the tap branch pressed A with no deliberate input from the player — which
+// is what was pulling the rider back off waves nobody touched the screen for.
+function touchEnd(e, cancelled) {
   e.preventDefault();
   if (e.touches.length === 0) {
     input.touch.active = false;
     input.touch.dragging = false;
     input.touch.dx = 0; input.touch.dy = 0;
     // quick tap without dragging = A button — unless it landed on the mute button
-    if (tapStart && !tapStart.moved && performance.now() - tapStart.time < 500) {
+    if (!cancelled && tapStart && !tapStart.moved && performance.now() - tapStart.time < 500) {
       if (inMute(canvasPos({ clientX: tapStart.x, clientY: tapStart.y }))) {
         audio.ensure(); audio.toggleMute();
       } else {
@@ -105,8 +113,8 @@ function touchEnd(e) {
     input.touch.x = p.x; input.touch.y = p.y;
   }
 }
-addEventListener('touchend', touchEnd, { passive: false });
-addEventListener('touchcancel', touchEnd, { passive: false });
+addEventListener('touchend', (e) => touchEnd(e, false), { passive: false });
+addEventListener('touchcancel', (e) => touchEnd(e, true), { passive: false });
 
 // desktop: the mute button is clickable too (keyboard still has M for music-only)
 addEventListener('mousedown', (e) => {

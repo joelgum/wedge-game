@@ -1,8 +1,8 @@
 // Boot + fixed-timestep game loop at NES-native 256x240, integer-scaled.
 // ?v= querystrings bust stale module caches on phones; bump together in all files
-import { input, MUTE_RECT } from './input.js?v=5';
+import { input, MUTE_RECT } from './input.js?v=6';
 import { audio } from './audio.js?v=7';
-import { makeScenes } from './scenes.js?v=46';
+import { makeScenes } from './scenes.js?v=47';
 
 const W = 256, H = 240;
 

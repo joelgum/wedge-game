@@ -1,6 +1,6 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
-import { input } from './input.js?v=5';
+import { input } from './input.js?v=6';
 import { audio } from './audio.js?v=7';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
@@ -153,6 +153,9 @@ const STANCE_LOCK = 400;
 // off the wave. Works on every wave — snakes, closeouts, bombs, and ones you simply had
 // second thoughts about (see startPullback).
 const PULL_WIN = 1.5;
+// Dead beat at the head of the pull-back window: nothing bails this soon after the
+// commit, so a fumbled release of the committing tap can't cost you the wave.
+const BAIL_ARM = 0.25;
 const PULL_BEAT = 1.9;   // length of the over-the-back cinematic
 
 // ---- NPC recolouring -------------------------------------------------------------
@@ -558,6 +561,7 @@ export function makeScenes(game) {
       if (this.snake) this.snake.x = this.riders[this.snake.idx].x;
       this.committed = false;
       this.pullT = 0;           // seconds left to change your mind (see startPullback)
+      this.commitSeq = -1;      // the A press that committed this wave (see bailPressed)
       this.pendingAward = 0;    // points banked on this wave that a pull back gives back
       this.rumbled = false;
       this.calledBig = false;   // the OUT DA BACK! shout fires once per monster
@@ -654,7 +658,7 @@ export function makeScenes(game) {
       // always runs out of the lineup and into the drop, and updateRide ticks the rest.
       if (this.committed && this.pullT > 0) {
         this.pullT -= dt;
-        if (input.pressed('a')) { this.startPullback(); return; }
+        if (this.bailPressed()) { this.startPullback(); return; }
       }
       // committing breaks the wave NOW: the build fast-forwards, the peak stops
       // wandering, and your grade was sealed the instant you pressed
@@ -756,6 +760,7 @@ export function makeScenes(game) {
           this.committed = true;
           this.commitD = Math.abs(this.px - this.sweetX());
           this.pullT = PULL_WIN;   // …but you have a beat and a half to think better of it
+          this.commitSeq = input.aSeq;         // which press this was — see bailPressed
           this.streakAtCommit = game.streak;   // a bail must leave the combo exactly as it was
           audio.select();
         }
@@ -1329,6 +1334,18 @@ export function makeScenes(game) {
       this.stanceHit = false;    // consumed by the toggle-off, so it can't re-enter this frame
     },
 
+    // Commit and pull back are the same button, and on touch the same gesture, so the bail
+    // has to be provably a SECOND deliberate press: never the one that committed (aSeq),
+    // and on a finger also not inside the dead beat at the head of the window. Without
+    // that, any stray or re-delivered finger-lift inside PULL_WIN threw the wave away
+    // silently and read as the rider pulling back on his own. A key press is unambiguous
+    // on its own, so it only needs to be a distinct press.
+    bailPressed() {
+      if (!input.pressed('a')) return false;
+      if (input.aSeq === this.commitSeq) return false;
+      return !input.usedTouch || this.pullT < PULL_WIN - BAIL_ARM;
+    },
+
     // ---- PULL BACK: you pressed again inside PULL_WIN and got off the wave. He rides UP
     //      the face and out over the back, and is left floating in the flat as it peels
     //      away without him. What it's worth depends on the wave you got off — the streak
@@ -1468,7 +1485,7 @@ export function makeScenes(game) {
         // lineup) — press again and you're off it, whatever kind of wave this is
         if (this.pullT > 0) {
           this.pullT -= dt;
-          if (input.pressed('a')) { this.startPullback(); return; }
+          if (this.bailPressed()) { this.startPullback(); return; }
         }
         // the drop: accelerating fall from the lip into the pocket, no bury risk yet
         this.dropT -= dt;
