@@ -1150,3 +1150,164 @@ Everything in the checklist at the top of the file, plus:
 - **Silhouettes still differ.** Squint at the three boarders side by side with colour off.
   If the grom and the veteran are the same shape lying down, the build didn't survive the
   pose change and the batch hasn't actually bought you anything.
+
+---
+
+# NPC drop + ride batch — identity through the whole sequence
+
+Written 2026-09-16, straight after the paddle batch shipped. **Nine prompts.** Joel watched a
+right-of-way wave and saw the veteran turn into somebody else the moment he dropped in.
+
+## What's still missing, and where it shows
+
+Every pose an NPC can be drawn in, and whether it carries the identity:
+
+| Pose | Used by | Identity art |
+|---|---|---|
+| `sit` | the lineup; the rest of the pack during an NPC beat | ✅ lineup batch |
+| `paddle` | stroking for the set; the NPC beat intro | ✅ paddle batch |
+| `drop` | the NPC beat, **and the right-of-way local dropping in** (`scenes.js` ~2324) | ❌ **this batch** |
+| `ride` | the NPC beat, **the snake ride** (~1148), plus the over-the-falls toss and the buried-in-churn beats — all the same frame, rotated | ❌ **this batch**, boarders only |
+
+The bodysurfers' `ride` needs nothing: `RIDER_ART.surfer` maps both `paddle` and `ride` to
+`sp_s_prone`, so the paddle batch already covered it. So: boarder `drop` ×3, boarder `ride` ×3,
+surfer `drop` ×3.
+
+**The toss reuse is deliberate** (confirmed with Joel 2026-09-16). The over-the-falls beat spins
+the `ride` frame up to ~3.8 radians, which reads as a tumbling body; the player's own boarder
+does the same. No dedicated ragdoll needed.
+
+## ⚠️ This batch uses a GREEN cutout screen, not magenta
+
+Every earlier batch used magenta, and it nearly cost us S2: her magenta one-piece landed 43
+units from the magenta background and converted as background — she came out looking naked
+until `--bg-tol 30` rescued her. B3's pink fins are in the same danger zone. Bright chroma
+green collides with nothing in the palette table (no identity wears green; the player's tank
+is green but he isn't in this batch).
+
+**Consequence for conversion:** the corner-colour auto-key still works, it's just green now.
+Don't copy the magenta-era `--bg-tol` values across — start from the default again.
+
+## The poses
+
+Match the shared frames for framing (`assets/spr_b_drop.png` 32×38, `spr_b_ride.png` 36×27,
+`spr_s_drop.png` 39×32 — note these are *taller* than the paddle frames, because the drop is a
+steep diagonal):
+
+- **Boarder drop** — steep, nose-down, board pitched ~45° toward the bottom right, rider prone
+  and hanging on, head up.
+- **Boarder ride** — prone and trimming across the face, board roughly level, knees bent up
+  behind, weight on the inside rail.
+- **Surfer drop** — diving in headfirst down the face, arms swept back along his sides, legs and
+  fins trailing up behind, spray off the entry.
+
+---
+
+## BD1 — `spr_b_drop_n1.png` · the grom, dropping in
+
+```
+8-bit pixel art game sprite of a small skinny teenage bodyboarder dropping in down the steep face of a wave, lying prone and gripping the rails of a red bodyboard that is pitched nose-down at a steep 45 degree angle toward the lower right, head up looking down the line, legs and short blue swim fins trailing up behind him, small wiry build with narrow shoulders, bleached blond surfer mop of hair, pale sunburnt skin, bare chest, black boardshorts, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a flat level board, a standing surfer, a surfboard, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## BD2 — `spr_b_drop_n2.png` · the veteran, dropping in
+
+```
+8-bit pixel art game sprite of a heavyset older man dropping in down the steep face of a wave on his bodyboard, lying prone and gripping the rails of a faded orange bodyboard that is pitched nose-down at a steep 45 degree angle toward the lower right, head up looking down the line, legs and short yellow swim fins trailing up behind him, thick barrel-chested build with broad round shoulders, short grey buzz cut and a grey moustache, deeply tanned leathery skin, sleeveless black wetsuit vest, black boardshorts, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a flat level board, a standing surfer, a surfboard, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## BD3 — `spr_b_drop_n3.png` · her wave, dropping in
+
+```
+8-bit pixel art game sprite of an athletic young woman dropping in down the steep face of a wave on her bodyboard, lying prone and gripping the rails of a purple bodyboard that is pitched nose-down at a steep 45 degree angle toward the lower right, head up looking down the line, legs and short pink swim fins trailing up behind her, lean athletic build with strong shoulders, long dark hair pulled back in a high ponytail streaming behind her, brown skin, teal one-piece swimsuit, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a flat level board, a standing surfer, a surfboard, a bikini, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## BR1 — `spr_b_ride_n1.png` · the grom, trimming
+
+```
+8-bit pixel art game sprite of a small skinny teenage bodyboarder riding across the face of a wave, lying prone on a red bodyboard held roughly level, both hands gripping the rails, chest lifted slightly, knees bent with short blue swim fins kicked up behind him, head up looking ahead down the line, small wiry build with narrow shoulders, bleached blond surfer mop of hair, pale sunburnt skin, bare chest, black boardshorts, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a nose-down or diving board, a standing surfer, a surfboard, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## BR2 — `spr_b_ride_n2.png` · the veteran, trimming
+
+```
+8-bit pixel art game sprite of a heavyset older man riding across the face of a wave on his bodyboard, lying prone on a faded orange bodyboard held roughly level, both hands gripping the rails, chest lifted slightly, knees bent with short yellow swim fins kicked up behind him, head up looking ahead down the line, thick barrel-chested build with broad round shoulders, short grey buzz cut and a grey moustache, deeply tanned leathery skin, sleeveless black wetsuit vest, black boardshorts, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a nose-down or diving board, a standing surfer, a surfboard, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## BR3 — `spr_b_ride_n3.png` · her wave, trimming
+
+```
+8-bit pixel art game sprite of an athletic young woman riding across the face of a wave on her bodyboard, lying prone on a purple bodyboard held roughly level, both hands gripping the rails, chest lifted slightly, knees bent with short pink swim fins kicked up behind her, head up looking ahead down the line, lean athletic build with strong shoulders, long dark hair pulled back in a high ponytail streaming behind her, brown skin, teal one-piece swimsuit, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a sitting or upright pose, a nose-down or diving board, a standing surfer, a surfboard, a bikini, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## SD1 — `spr_s_drop_n1.png` · the lanky one, diving in
+
+```
+8-bit pixel art game sprite of a tall lanky bodysurfer diving in down the steep face of a wave with no board, body angled head-down toward the lower right, both arms swept back along his sides, legs and bright blue swim fins trailing up behind him, spray bursting off his entry, long lean build, shaggy red hair, freckled pale skin, bare chest, orange swim trunks, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a bodyboard, a surfboard, any board at all, treading water, an upright pose, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## SD2 — `spr_s_drop_n2.png` · shoulders, diving in
+
+```
+8-bit pixel art game sprite of a strong-shouldered woman bodysurfing, diving in down the steep face of a wave with no board, body angled head-down toward the lower right, both arms swept back along her sides, legs and lime swim fins trailing up behind her, spray bursting off her entry, powerful build with broad shoulders, black hair in a tight bun, brown skin, magenta one-piece swimsuit, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a bodyboard, a surfboard, any board at all, treading water, an upright pose, a bikini, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+## SD3 — `spr_s_drop_n3.png` · the old boy, diving in
+
+```
+8-bit pixel art game sprite of a heavyset older bodysurfer diving in down the steep face of a wave with no board, body angled head-down toward the lower right, both arms swept back along his sides, legs and orange swim fins trailing up behind him, spray bursting off his entry, thick heavy build with a broad back, bald shaved head, deeply tanned leathery skin, sleeveless black wetsuit top, grey swim trunks, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain solid bright chroma-key green background for easy cutout. Do not include: photorealism, blur, smooth shading, a bodyboard, a surfboard, any board at all, treading water, an upright pose, multiple figures, a grid or reference sheet, text, or a watermark.
+```
+
+---
+
+## Judging this batch
+
+Everything in the paddle batch's checklist, plus:
+
+- **Same person as the sit AND paddle frames.** There are now two references per identity —
+  open both. An identity that drifts between its own four poses is worse than one that never had
+  them, because the player sees all four in sequence on a right-of-way wave.
+- **Drop is steep, ride is level.** The two boarder poses differ mainly in board angle, and
+  Gemini will happily give you two of the same. If BD and BR come back looking alike, re-roll the
+  one that's wrong rather than shipping a pair that don't read as different moments.
+- **Direction, still.** Facing RIGHT. B3 needed a re-roll for this last time; naming the geometry
+  ("head and arms on the RIGHT, travelling left to right") beat repeating the word RIGHT.
+
+## Converting this batch — the commands that shipped
+
+All nine came back with a clean lattice (eight at 100×100, SD3 at 80×80), so **no `--grid 1024`
+this time** — a first. The green screen may be helping the detector; the magenta batches split
+50/50.
+
+**Size angled poses by the DIAGONAL, not by width or height.** Drops are steep, so neither axis
+alone is meaningful — match `sqrt(w² + h²)` against the shared frame's. Bases: `spr_b_drop.png`
+32×38 (diag 49.7), `spr_b_ride.png` 36×27 (45.0), `spr_s_drop.png` 39×32 (50.4). And key the
+spray **before** reading the bbox, or a plume inflates it and everything comes out too small.
+
+```sh
+# boarder drop — no keying needed; their only blue is the grom's fins
+python3 execution/pixelate_sprite.py --scale 0.564 art-src/spr_b_drop_n1.jpg assets/spr_b_drop_n1.png
+python3 execution/pixelate_sprite.py --scale 0.449 art-src/spr_b_drop_n2.jpg assets/spr_b_drop_n2.png
+python3 execution/pixelate_sprite.py --scale 0.584 art-src/spr_b_drop_n3.jpg assets/spr_b_drop_n3.png
+# boarder ride
+python3 execution/pixelate_sprite.py --scale 0.568 art-src/spr_b_ride_n1.jpg assets/spr_b_ride_n1.png
+python3 execution/pixelate_sprite.py --scale 0.568 art-src/spr_b_ride_n2.jpg assets/spr_b_ride_n2.png
+python3 execution/pixelate_sprite.py --scale 0.475 art-src/spr_b_ride_n3.jpg assets/spr_b_ride_n3.png
+# surfer drop — SD1 keys the WHITE spray only (see below); SD2/SD3 key spray + sea
+python3 execution/pixelate_sprite.py --key-at 528,332 --scale 0.45 \
+  art-src/spr_s_drop_n1.jpg assets/spr_s_drop_n1.png
+python3 execution/pixelate_sprite.py --key-at 412,292 --key-at 188,700 --key-at 628,392 --scale 0.455 \
+  art-src/spr_s_drop_n2.jpg assets/spr_s_drop_n2.png
+python3 execution/pixelate_sprite.py --key-at 136,364 --key-at 92,208 --scale 0.688 \
+  art-src/spr_s_drop_n3.jpg assets/spr_s_drop_n3.png
+```
+
+**⚠️ A "water cluster" can be the rider.** The cluster finder reported a big blue field in SD1
+at (240,148) and keying it hollowed out his fins — because that blue *was* his fins:
+(22,141,229) at the "water" sample versus (24,139,228) on the fin itself. Identical. SD1 has no
+painted sea at all, only white spray. **Probe a candidate key against the gear it might collide
+with before using it** — SD2 (lime fins) and SD3 (orange fins) had no such conflict and keyed
+their sea safely. This is the same trap as B1's paddle frame, one step more disguised: there,
+the sea was real and merely close; here, there was no sea.
+
+**Sizes landed:** drops 38–43 wide, rides 41–42 wide, dives 39–41 wide — consistent within each
+pose group, which is what matters when three identities appear in sequence.

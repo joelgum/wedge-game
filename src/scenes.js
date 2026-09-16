@@ -48,7 +48,7 @@ function newDailyRand() { return mulberry32(hashStr(dailyKey())); }
 // Preloaded background art (Midjourney-derived, served from ./assets/ by serve.py).
 // Scenes draw these when loaded and fall back to procedural rendering until then.
 const IMG = {};
-function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=21'; IMG[key] = i; }
+function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=22'; IMG[key] = i; }
 function imgReady(key) { const i = IMG[key]; return i && i.complete && i.naturalWidth > 0; }
 loadImg('title', 'title.png');
 loadImg('select', 'select.png');
@@ -146,6 +146,20 @@ loadImg('sp_b_paddle_n3', 'spr_b_paddle_n3.png');
 loadImg('sp_s_prone_n1', 'spr_s_prone_n1.png');
 loadImg('sp_s_prone_n2', 'spr_s_prone_n2.png');
 loadImg('sp_s_prone_n3', 'spr_s_prone_n3.png');
+// Drop + ride, per identity — without these a local is still himself paddling and then a
+// stranger the moment he drops in, which is the whole right-of-way beat. `ride` also carries
+// the over-the-falls toss and the buried-in-churn frames (same sprite, rotated). The surfer's
+// ride is sp_s_prone above, so he needs a drop only. Prompts: SPRITE_PROMPTS.md § NPC drop +
+// ride batch; uncomment each as its PNG lands.
+loadImg('sp_b_drop_n1', 'spr_b_drop_n1.png');
+loadImg('sp_b_drop_n2', 'spr_b_drop_n2.png');
+loadImg('sp_b_drop_n3', 'spr_b_drop_n3.png');
+loadImg('sp_b_ride_n1', 'spr_b_ride_n1.png');
+loadImg('sp_b_ride_n2', 'spr_b_ride_n2.png');
+loadImg('sp_b_ride_n3', 'spr_b_ride_n3.png');
+loadImg('sp_s_drop_n1', 'spr_s_drop_n1.png');
+loadImg('sp_s_drop_n2', 'spr_s_drop_n2.png');
+loadImg('sp_s_drop_n3', 'spr_s_drop_n3.png');
 
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
