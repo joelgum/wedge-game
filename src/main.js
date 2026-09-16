@@ -1,8 +1,8 @@
 // Boot + fixed-timestep game loop at NES-native 256x240, integer-scaled.
 // ?v= querystrings bust stale module caches on phones; bump together in all files
-import { input, MUTE_RECT, PAUSE_RECT, inRect } from './input.js?v=7';
+import { input, MUTE_RECT, PAUSE_RECT, inRect } from './input.js?v=8';
 import { audio } from './audio.js?v=7';
-import { makeScenes } from './scenes.js?v=55';
+import { makeScenes } from './scenes.js?v=56';
 
 const W = 256, H = 240;
 
@@ -59,8 +59,11 @@ function quitRun() {
   else game.goto('gameover');
 }
 // pause-menu buttons, laid out here because the overlay is drawn here too
-const RESUME_RECT = { x: 40, y: 138, w: 80, h: 24 };
-const QUIT_RECT = { x: 136, y: 138, w: 80, h: 24 };
+// 84x34 canvas px ≈ 123x50pt on a 375pt phone. The 20px gutter between them matters more
+// than the size does: QUIT ends the run, so it must not sit under the edge of a thumb
+// aiming at RESUME.
+const RESUME_RECT = { x: 34, y: 132, w: 84, h: 34 };
+const QUIT_RECT = { x: 138, y: 132, w: 84, h: 34 };
 addEventListener('keydown', (e) => {
   if (e.code === 'KeyP' && !e.repeat) setPaused(!paused);
   else if (e.code === 'KeyQ' && !e.repeat && paused && inRun()) quitRun();
@@ -89,11 +92,12 @@ game.goto('title');
 function drawPause(ctx) {
   if (!inRun() || paused) return;
   const r = PAUSE_RECT;
+  // plate is inset from the hit box — the target is bigger than it looks, by design
   ctx.fillStyle = 'rgba(8,8,32,0.5)';
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillRect(r.x + 4, r.y + 6, 22, 20);
   ctx.fillStyle = '#f8f8f8';
-  ctx.fillRect(r.x + 5, r.y + 4, 4, 10);
-  ctx.fillRect(r.x + 11, r.y + 4, 4, 10);
+  ctx.fillRect(r.x + 10, r.y + 11, 4, 10);
+  ctx.fillRect(r.x + 16, r.y + 11, 4, 10);
 }
 
 function drawMute(ctx) {
@@ -147,9 +151,9 @@ function frame(now) {
       ctx.strokeStyle = on ? '#f8f8f8' : '#585868';
       ctx.lineWidth = 1;
       ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
-      ctx.font = "bold 10px 'Courier New', monospace";
+      ctx.font = "bold 11px 'Courier New', monospace";
       ctx.fillStyle = on ? '#fff' : '#787888';
-      ctx.fillText(label, r.x + r.w / 2, r.y + 7);
+      ctx.fillText(label, r.x + r.w / 2, r.y + 12);
     };
     btn(RESUME_RECT, 'RESUME', true, 'rgba(40,120,60,0.95)');
     btn(QUIT_RECT, 'QUIT', inRun(), 'rgba(150,50,40,0.95)');
@@ -157,7 +161,7 @@ function frame(now) {
       ctx.font = "bold 7px 'Courier New', monospace";
       ctx.fillStyle = '#c8c8d8';
       ctx.fillText(game.daily ? 'QUIT ENDS YOUR DAILY ATTEMPT'
-        : (input.usedTouch ? 'QUIT ENDS THE RUN' : 'QUIT ENDS THE RUN · Q'), W / 2, 168);
+        : (input.usedTouch ? 'QUIT ENDS THE RUN' : 'QUIT ENDS THE RUN · Q'), W / 2, 174);
     }
     drawMute(ctx);
     requestAnimationFrame(frame);

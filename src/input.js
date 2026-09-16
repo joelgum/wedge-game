@@ -7,7 +7,11 @@ import { audio } from './audio.js?v=7';
 export const MUTE_RECT = { x: 234, y: 221, w: 20, h: 18 };
 // on-screen PAUSE button, bottom-LEFT so it mirrors the speaker without colliding with the
 // score (top-right) or the hearts (top-left). Only drawn during a run — see main.js.
-export const PAUSE_RECT = { x: 2, y: 221, w: 20, h: 18 };
+// 30x30 canvas px ≈ 44x44pt on a 375pt-wide phone, which is the smallest target a thumb
+// hits reliably. The drawn glyph is smaller than the hit box on purpose: it stays out of
+// the way visually while still being easy to hit. (The speaker is deliberately NOT enlarged
+// — a bigger mute button means more accidental mutes, which has bitten this game before.)
+export const PAUSE_RECT = { x: 2, y: 208, w: 30, h: 30 };
 export function inRect(p, r) {
   return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
 }
