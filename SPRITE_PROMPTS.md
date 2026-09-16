@@ -235,6 +235,13 @@ tell.** Once a local drops in, he or she is the standard silhouette wearing that
 colours. At 30 px in a one-second beat that holds up; if a variant ever needs to read as
 itself mid-ride, generate its `ride` frame too and drop it in under the same name.
 
+> **2026-09-16 — it didn't hold up, on one pose.** The beat this reasoning missed is the
+> *paddle*: when the set arrives the whole lineup drops prone at once, so you watch all three
+> locals change person simultaneously, side by side, with the sit frame still fresh in your
+> eye. That's a different thing from a single rider mid-ride. Fixed by the **NPC paddle
+> batch** at the end of this file. The rest of the reasoning stands — `drop` and `ride` are
+> still recolour-only for the boarders.
+
 ## Pin the palette before you generate
 
 The recolour needs to know which colour means what, so each identity's colours are fixed
@@ -594,3 +601,552 @@ The boarder needs nothing: his old frames already match the new set.
   still reads as a rider it will survive the in-game rotation.
 - **Bodysurfer's roll frame:** flip it *vertically* (mirror top-to-bottom), not rotate.
   That's exactly what the game does to it mid-roll, and it has to still read belly-up.
+
+---
+
+# NPC paddle batch — the locals stay themselves when the set arrives
+
+Written 2026-09-16. **Six prompts**: the paddle pose for all six NPC identities. This is
+the follow-up the lineup batch predicted ("if a variant ever needs to read as itself
+mid-ride, generate its frame too and drop it in under the same name").
+
+## The problem this fixes
+
+`localKey()` prefers a generated per-identity frame and falls back to the shared frame with
+only the **gear hue** swapped. Generated frames exist for exactly one pose:
+
+```
+sp_b_sit_n1/n2/n3     boarder lineup     ✓ real identity art
+sp_s_tread_n1/n2/n3   surfer lineup      ✓ real identity art
+paddle · drop · ride  shared frame + gear recolour only
+```
+
+So while the pack is waiting, each local is a distinct person — own build, hair, gender.
+The moment the wave stands up and everyone drops prone (`q > 0.55`, and the right-of-way
+rider earlier at `q > 0.42`) they all snap to the same base sprite tinted to their colours.
+Same gear, different person — and you're watching all three at once, which is what makes it
+obvious. Hair, skin, fins and outline all sit in the same near-black bands, so no recolour
+rule can carry them; it has to be art.
+
+**The bodysurfers come out ahead.** `RIDER_ART.surfer` maps *both* `paddle` and `ride` to
+`sp_s_prone`, so `spr_s_prone_nN` fixes the surfer locals paddling **and** riding, in one
+render each. The boarders' `drop` and `ride` stay shared-frame for now — a boarder local is
+only on screen alone for the ~1s NPC beat, where the swap is much harder to catch.
+
+## Same palette table, same people
+
+Use the table in the NPC batch above — **these are the same six characters, three months
+older, lying down**. That is the whole judging criterion: B1's paddle frame has to be
+recognisably the same grom as B1's sit frame. Generate each paddle prompt with its lineup
+PNG open beside you.
+
+Both poses are **horizontal and half-submerged**, facing **RIGHT**, waterline across the
+body. Reference the existing shared frames for framing: `spr_b_paddle.png` is 42×15 and
+`spr_s_prone.png` is 47×12 — long and flat, not the portrait framing the lineup used.
+
+---
+
+## B1p — `spr_b_paddle_n1.png` · the grom, stroking
+
+```
+8-bit pixel art game sprite of a small skinny teenage bodyboarder lying prone on his board
+paddling for a wave, chest flat on a red bodyboard, one arm reaching forward mid-stroke with
+the hand cutting into the water, other hand gripping the nose rail, legs trailing straight
+out behind with short blue swim fins kicking, head up looking forward, small wiry build with
+narrow shoulders, bleached blond surfer mop of hair, pale sunburnt skin, bare chest, black
+boardshorts, waterline across the board, body long and low and horizontal filling the frame
+edge to edge, NES video game style 1987, limited 16-color palette, chunky pixels, flat
+shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on
+a plain solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth
+shading, sitting upright, standing surfer, surfboard, multiple figures, grid, reference
+sheet, text, watermark
+```
+
+## B2p — `spr_b_paddle_n2.png` · the veteran, stroking
+
+```
+8-bit pixel art game sprite of a heavyset older man lying prone on his bodyboard paddling
+for a wave, chest flat on a faded orange bodyboard, one arm reaching forward mid-stroke with
+the hand cutting into the water, other hand gripping the nose rail, legs trailing straight
+out behind with short yellow swim fins kicking, head up looking forward, thick barrel-chested
+build with broad round shoulders, short grey buzz cut and a grey moustache, deeply tanned
+leathery skin, sleeveless black wetsuit vest, black boardshorts, waterline across the board,
+body long and low and horizontal filling the frame edge to edge, NES video game style 1987,
+limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single
+figure, side view facing RIGHT, centered on a plain solid magenta background for easy cutout
+--ar 1:1 --no photorealism, blur, smooth shading, sitting upright, standing surfer,
+surfboard, multiple figures, grid, reference sheet, text, watermark
+```
+
+## B3p — `spr_b_paddle_n3.png` · her wave, stroking
+
+```
+8-bit pixel art game sprite of an athletic young woman lying prone on her bodyboard paddling
+for a wave, chest flat on a purple bodyboard, one arm reaching forward mid-stroke with the
+hand cutting into the water, other hand gripping the nose rail, legs trailing straight out
+behind with short pink swim fins kicking, head up looking forward, lean athletic build with
+strong shoulders, long dark hair pulled back in a high ponytail streaming behind her, brown
+skin, teal one-piece swimsuit, waterline across the board, body long and low and horizontal
+filling the frame edge to edge, NES video game style 1987, limited 16-color palette, chunky
+pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, sitting upright, standing surfer, surfboard, bikini, multiple figures,
+grid, reference sheet, text, watermark
+```
+
+## S1p — `spr_s_prone_n1.png` · the lanky one, planing
+
+```
+8-bit pixel art game sprite of a tall lanky bodysurfer planing prone across the water with
+no board, lead arm stretched straight out in front of him cutting the surface, other arm
+tight along his side, body flat and streamlined just under the surface, legs trailing
+straight back with bright blue swim fins, head up and forward with spray at his shoulder,
+long lean build, shaggy red hair, freckled pale skin, bare chest, orange swim trunks,
+waterline along his body, long and low and horizontal filling the frame edge to edge, NES
+video game style 1987, limited 16-color palette, chunky pixels, flat shading, no
+anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain
+solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
+bodyboard, surfboard, any board at all, treading water, upright, multiple figures, grid,
+reference sheet, text, watermark
+```
+
+## S2p — `spr_s_prone_n2.png` · shoulders, planing
+
+```
+8-bit pixel art game sprite of a strong-shouldered woman bodysurfing prone across the water
+with no board, lead arm stretched straight out in front of her cutting the surface, other
+arm tight along her side, body flat and streamlined just under the surface, legs trailing
+straight back with lime swim fins, head up and forward with spray at her shoulder, powerful
+build with broad shoulders, black hair in a tight bun, brown skin, magenta one-piece
+swimsuit, waterline along her body, long and low and horizontal filling the frame edge to
+edge, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no
+anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain
+solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
+bodyboard, surfboard, any board at all, treading water, upright, bikini, multiple figures,
+grid, reference sheet, text, watermark
+```
+
+## S3p — `spr_s_prone_n3.png` · the old boy, planing
+
+```
+8-bit pixel art game sprite of a heavyset older bodysurfer planing prone across the water
+with no board, lead arm stretched straight out in front of him cutting the surface, other
+arm tight along his side, body flat and streamlined just under the surface, legs trailing
+straight back with orange swim fins, head up and forward with spray at his shoulder, thick
+heavy build with a broad back, bald shaved head, deeply tanned leathery skin, sleeveless
+black wetsuit top, grey swim trunks, waterline along his body, long and low and horizontal
+filling the frame edge to edge, NES video game style 1987, limited 16-color palette, chunky
+pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, bodyboard, surfboard, any board at all, treading water, upright,
+multiple figures, grid, reference sheet, text, watermark
+```
+
+---
+
+## Generating this batch in AI Studio — what actually worked
+
+**Generate in Safari, not through browser automation.** Driving the Playground with the
+Chrome extension returns *"Failed to generate content: permission denied"* on every image
+model. Ruled out, one denied call each, nothing charged: the `• Paid` tier (unbadged Lite
+denies too), the model (NB2 and Pro), the Antigravity agent harness holding the chat (a
+fresh **New chat** denies), and a content refusal (a trivial "red bodyboard on the sand"
+prompt denies). Joel generates fine by hand in Safari on a Gemini Pro subscription with no
+API key — so it's the automation, not the account. Don't go chasing an API key.
+
+**Run settings** (Playground → Run settings):
+
+| Setting | Value | Why |
+|---|---|---|
+| Model | Nano Banana Pro · `gemini-3-pro-image` | what this batch used; $0.134/image |
+| Output format | **Images only** | the default spends output tokens narrating the picture |
+| Aspect ratio | **1:1** | defaults to Auto — set it, or the pose comes back letterboxed |
+| Resolution | **1K** | matches what `pixelate_sprite.py` is tuned against |
+| Tools | remove Grounding with Google Search | on by default, useless here, and it bills |
+
+**Drop the Midjourney flags when prompting Gemini.** AI Studio has a real aspect-ratio
+control and no negative-prompt field, so `--ar 1:1` is redundant and the `--no` list is read
+as *literal prompt text* — a list of things to draw. Rewrite the tail as a sentence:
+
+> …centered on a plain solid magenta background for easy cutout. **Do not include:
+> photorealism, blur, smooth shading, a sitting or upright pose, a standing surfer, a
+> surfboard, multiple figures, a grid or reference sheet, text, or a watermark.**
+
+**⚠️ Never give an identity gear the same colour as the cutout background.** S2's magenta
+one-piece landed 43 units from the magenta background and was keyed out as background — she
+converted as a naked-looking brown figure. Fixed with `--bg-tol 30`, but the real lesson is
+for the *next* palette table: magenta gear on a magenta screen is a trap. Same class of
+problem as B1, whose blue fins sit 28 units from the blue sea.
+
+**Direction is still the main re-roll.** B3 came back facing LEFT first time (v1 kept at
+`art-src/spr_b_paddle_n3_v1_facingleft.jpg`). What fixed it was naming the geometry rather
+than repeating the word RIGHT: *"her head and both arms on the RIGHT side of the image,
+travelling left to right, legs trailing back to the LEFT"*.
+
+## Converting this batch
+
+Same as the trick batch — the lineup poses are smaller in frame than an action pose, so
+check `--report` and adjust:
+
+```sh
+python3 execution/pixelate_sprite.py --report art-src/spr_b_sit_n1.jpg
+python3 execution/pixelate_sprite.py --scale 0.65 art-src/spr_b_sit_n1.jpg assets/spr_b_sit_n1.png
+```
+
+Target heights: boarders sitting ≈ 34–38 px (next to `spr_b_sit.png` at 36), bodysurfers
+treading ≈ 34–38 px (next to `spr_s_tread.png` at 37). If a render comes out short because
+the figure sits small in the 1024 frame, raise `--scale` rather than accepting a 24 px NPC.
+
+## Conversion notes — what this batch actually needed
+
+All six installed 2026-07-29. The commands are not uniform, because the renders weren't:
+
+```sh
+# boarders: key the deep water AND the surface highlight + ripple dashes (wider tol on
+# those two, or stray blue specks survive as pixels floating in mid-air)
+python3 execution/pixelate_sprite.py --key-at 952,636 --key-at 60,632,72 --key-at 60,670,72 \
+  --scale 0.61 art-src/spr_b_sit_n1.jpg assets/spr_b_sit_n1.png     # n2 same, n3 --scale 0.59
+# S1: no regular lattice at all -> sample at native res and crop off the full-width waterline
+python3 execution/pixelate_sprite.py --grid 1024 --crop 300,140,745,975 \
+  --key-at 296,512 --key-at 20,514 --scale 0.044 art-src/spr_s_tread_n1.jpg assets/spr_s_tread_n1.png
+# S2 / S3: 100x100 grids, no crop needed
+python3 execution/pixelate_sprite.py --key-at 92,528 --key-at 20,514 --scale 0.44 ...
+python3 execution/pixelate_sprite.py --key-at 0,524  --key-at 20,514 --scale 0.40 ...
+```
+
+**Three things this batch taught the converter.**
+
+1. **Gemini painted the sea as a second opaque field**, not as magenta. The default keying
+   only drops the corner colour, so the water came through as a solid block — hence
+   `--key-at`, repeatable, with an optional per-colour tolerance. The surface highlight and
+   ripple dashes are a *third* colour and need their own key.
+2. **`--grid` exists because S1 has no regular lattice.** Its block edges came in at
+   4.5–7.6 px, so it only *looks* blocky. Passing `--grid 1024` samples at native
+   resolution and lets `--scale` do the downsampling, which doesn't care about regularity.
+3. **The lattice tolerance had to become proportional to block size.** Held at a flat
+   1.2 px it is a large fraction of a small block, so every fine lattice "fits" — S1's real
+   grid is ~205 and the detector was confidently reporting 400+. Now a render with no real
+   grid correctly returns *no grid found* and tells you to use `--grid`.
+
+**Scales are per file, not the usual 0.65.** This batch arrived at three different logical
+resolutions (80, 100, and none) and wildly different zoom — S3 fills his whole frame, S1 is
+a small figure in a big one. Pick the scale from the measured bbox to land ~36 px tall, next
+to `spr_b_sit.png` at 36. Don't assume the house factor carries over.
+
+**S3 was re-rolled 2026-07-29** — the first render was drawn so zoomed that he dwarfed the
+other two and his fins were clipped by the frame edge. The replacement (`--key-at 215,700
+--key-at 215,433,72 --scale 0.655`) is leaner, complete, and sits properly beside S1 and S2.
+First version archived at `art-src/spr_s_tread_n3_v1.jpg`. Note his fins came back **yellow**
+rather than the table's orange; left as-is, since the fins are recoloured to grey in his
+three motion poses anyway and only the lineup frame shows them.
+
+**One cosmetic compromise, accepted:** S2 is clipped by the bottom frame edge, so her fins
+are cut a little short.
+
+### ⚠️ Open: the bodysurfer lineup mixes poses
+
+The three NPC bodysurfers came back **upright**, exactly as prompted. The player's own
+`spr_s_tread` came back **horizontal** and was kept because it read well on its own. Put
+them side by side and the locals stand while you float — visible in a bodysurfer lineup.
+
+Cheapest fix is one render, not three: re-roll **prompt 9** with the upright pose stated
+hard (*"vertical body, upright in the water, legs hanging straight down, NOT lying flat"*)
+so the player matches the crowd. The alternative — re-rolling all three NPCs horizontal —
+costs three renders and loses the standing silhouettes that carry their build.
+
+## Judging this batch
+
+Everything in the checklist at the top of the file, plus:
+
+- **Waterline, not a full body.** Both lineup poses are half-submerged. A render showing
+  legs and feet below the surface is wrong — the game draws these bobbing at the sea line.
+- **The board is flat, not upright.** Boarders sit astride a board lying flat on the water.
+  Gemini likes to stand the board up like a surfboard.
+- **Silhouettes must differ at a glance.** Put the three boarders side by side at 1:1 and
+  squint: if you can't tell the grom from the veteran without colour, the build didn't come
+  through and it's worth a re-roll — colour alone is what the recolour already gives you.
+
+The boarder needs nothing: his old frames already match the new set.
+
+## Judging a generation before you cut it out
+
+- **Direction:** facing RIGHT. Gemini flips riders constantly — reject rather than mirror
+  (mirroring puts the part in his wrong hand and reverses the board's rocker).
+- **No board on the bodysurfer.** Most common failure by far.
+- **Pixel scale matches:** stand it next to `spr_b_ride.png` at 1:1. If its pixels are
+  finer, downscale to ~32 px tall with **nearest-neighbour** before cutting out.
+- **Palette:** flat blocks, no soft shading. AI "pixel art" is usually faux-pixel with
+  thousands of colours — palette-snap to 16 in Aseprite/Piskel if it's soft.
+- **Boarder's spin frame:** cover it with your thumb and rotate the image 180° — if it
+  still reads as a rider it will survive the in-game rotation.
+- **Bodysurfer's roll frame:** flip it *vertically* (mirror top-to-bottom), not rotate.
+  That's exactly what the game does to it mid-roll, and it has to still read belly-up.
+
+---
+
+# NPC paddle batch — the locals stay themselves when the set arrives
+
+Written 2026-09-16. **Six prompts**: the paddle pose for all six NPC identities. This is
+the follow-up the lineup batch predicted ("if a variant ever needs to read as itself
+mid-ride, generate its frame too and drop it in under the same name").
+
+## The problem this fixes
+
+`localKey()` prefers a generated per-identity frame and falls back to the shared frame with
+only the **gear hue** swapped. Generated frames exist for exactly one pose:
+
+```
+sp_b_sit_n1/n2/n3     boarder lineup     ✓ real identity art
+sp_s_tread_n1/n2/n3   surfer lineup      ✓ real identity art
+paddle · drop · ride  shared frame + gear recolour only
+```
+
+So while the pack is waiting, each local is a distinct person — own build, hair, gender.
+The moment the wave stands up and everyone drops prone (`q > 0.55`, and the right-of-way
+rider earlier at `q > 0.42`) they all snap to the same base sprite tinted to their colours.
+Same gear, different person — and you're watching all three at once, which is what makes it
+obvious. Hair, skin, fins and outline all sit in the same near-black bands, so no recolour
+rule can carry them; it has to be art.
+
+**The bodysurfers come out ahead.** `RIDER_ART.surfer` maps *both* `paddle` and `ride` to
+`sp_s_prone`, so `spr_s_prone_nN` fixes the surfer locals paddling **and** riding, in one
+render each. The boarders' `drop` and `ride` stay shared-frame for now — a boarder local is
+only on screen alone for the ~1s NPC beat, where the swap is much harder to catch.
+
+## Same palette table, same people
+
+Use the table in the NPC batch above — **these are the same six characters, three months
+older, lying down**. That is the whole judging criterion: B1's paddle frame has to be
+recognisably the same grom as B1's sit frame. Generate each paddle prompt with its lineup
+PNG open beside you.
+
+Both poses are **horizontal and half-submerged**, facing **RIGHT**, waterline across the
+body. Reference the existing shared frames for framing: `spr_b_paddle.png` is 42×15 and
+`spr_s_prone.png` is 47×12 — long and flat, not the portrait framing the lineup used.
+
+---
+
+## B1p — `spr_b_paddle_n1.png` · the grom, stroking
+
+```
+8-bit pixel art game sprite of a small skinny teenage bodyboarder lying prone on his board
+paddling for a wave, chest flat on a red bodyboard, one arm reaching forward mid-stroke with
+the hand cutting into the water, other hand gripping the nose rail, legs trailing straight
+out behind with short blue swim fins kicking, head up looking forward, small wiry build with
+narrow shoulders, bleached blond surfer mop of hair, pale sunburnt skin, bare chest, black
+boardshorts, waterline across the board, body long and low and horizontal filling the frame
+edge to edge, NES video game style 1987, limited 16-color palette, chunky pixels, flat
+shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on
+a plain solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth
+shading, sitting upright, standing surfer, surfboard, multiple figures, grid, reference
+sheet, text, watermark
+```
+
+## B2p — `spr_b_paddle_n2.png` · the veteran, stroking
+
+```
+8-bit pixel art game sprite of a heavyset older man lying prone on his bodyboard paddling
+for a wave, chest flat on a faded orange bodyboard, one arm reaching forward mid-stroke with
+the hand cutting into the water, other hand gripping the nose rail, legs trailing straight
+out behind with short yellow swim fins kicking, head up looking forward, thick barrel-chested
+build with broad round shoulders, short grey buzz cut and a grey moustache, deeply tanned
+leathery skin, sleeveless black wetsuit vest, black boardshorts, waterline across the board,
+body long and low and horizontal filling the frame edge to edge, NES video game style 1987,
+limited 16-color palette, chunky pixels, flat shading, no anti-aliasing, no gradients, single
+figure, side view facing RIGHT, centered on a plain solid magenta background for easy cutout
+--ar 1:1 --no photorealism, blur, smooth shading, sitting upright, standing surfer,
+surfboard, multiple figures, grid, reference sheet, text, watermark
+```
+
+## B3p — `spr_b_paddle_n3.png` · her wave, stroking
+
+```
+8-bit pixel art game sprite of an athletic young woman lying prone on her bodyboard paddling
+for a wave, chest flat on a purple bodyboard, one arm reaching forward mid-stroke with the
+hand cutting into the water, other hand gripping the nose rail, legs trailing straight out
+behind with short pink swim fins kicking, head up looking forward, lean athletic build with
+strong shoulders, long dark hair pulled back in a high ponytail streaming behind her, brown
+skin, teal one-piece swimsuit, waterline across the board, body long and low and horizontal
+filling the frame edge to edge, NES video game style 1987, limited 16-color palette, chunky
+pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, sitting upright, standing surfer, surfboard, bikini, multiple figures,
+grid, reference sheet, text, watermark
+```
+
+## S1p — `spr_s_prone_n1.png` · the lanky one, planing
+
+```
+8-bit pixel art game sprite of a tall lanky bodysurfer planing prone across the water with
+no board, lead arm stretched straight out in front of him cutting the surface, other arm
+tight along his side, body flat and streamlined just under the surface, legs trailing
+straight back with bright blue swim fins, head up and forward with spray at his shoulder,
+long lean build, shaggy red hair, freckled pale skin, bare chest, orange swim trunks,
+waterline along his body, long and low and horizontal filling the frame edge to edge, NES
+video game style 1987, limited 16-color palette, chunky pixels, flat shading, no
+anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain
+solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
+bodyboard, surfboard, any board at all, treading water, upright, multiple figures, grid,
+reference sheet, text, watermark
+```
+
+## S2p — `spr_s_prone_n2.png` · shoulders, planing
+
+```
+8-bit pixel art game sprite of a strong-shouldered woman bodysurfing prone across the water
+with no board, lead arm stretched straight out in front of her cutting the surface, other
+arm tight along her side, body flat and streamlined just under the surface, legs trailing
+straight back with lime swim fins, head up and forward with spray at her shoulder, powerful
+build with broad shoulders, black hair in a tight bun, brown skin, magenta one-piece
+swimsuit, waterline along her body, long and low and horizontal filling the frame edge to
+edge, NES video game style 1987, limited 16-color palette, chunky pixels, flat shading, no
+anti-aliasing, no gradients, single figure, side view facing RIGHT, centered on a plain
+solid magenta background for easy cutout --ar 1:1 --no photorealism, blur, smooth shading,
+bodyboard, surfboard, any board at all, treading water, upright, bikini, multiple figures,
+grid, reference sheet, text, watermark
+```
+
+## S3p — `spr_s_prone_n3.png` · the old boy, planing
+
+```
+8-bit pixel art game sprite of a heavyset older bodysurfer planing prone across the water
+with no board, lead arm stretched straight out in front of him cutting the surface, other
+arm tight along his side, body flat and streamlined just under the surface, legs trailing
+straight back with orange swim fins, head up and forward with spray at his shoulder, thick
+heavy build with a broad back, bald shaved head, deeply tanned leathery skin, sleeveless
+black wetsuit top, grey swim trunks, waterline along his body, long and low and horizontal
+filling the frame edge to edge, NES video game style 1987, limited 16-color palette, chunky
+pixels, flat shading, no anti-aliasing, no gradients, single figure, side view facing RIGHT,
+centered on a plain solid magenta background for easy cutout --ar 1:1 --no photorealism,
+blur, smooth shading, bodyboard, surfboard, any board at all, treading water, upright,
+multiple figures, grid, reference sheet, text, watermark
+```
+
+---
+
+## Generating this batch in AI Studio — settings and the blocker
+
+Recon done 2026-09-16 by driving aistudio.google.com in Joel's Chrome. Findings worth
+keeping, because none of it is guessable from the prompt text:
+
+**⚠️ Driving the Playground from browser automation gets *"Failed to generate content:
+permission denied"* on every image model.** Joel generates images in this same account by
+hand without any API key (Gemini Pro subscription), so this is **not** an account gate and
+**not** a billing problem — do not go chasing an API key. What was ruled out, one denied
+call each, nothing charged:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| It's the `• Paid` tier | Nano Banana 2 **Lite**, which has no badge | denied |
+| It's the model | Nano Banana 2, Nano Banana **Pro** | denied |
+| It's the Antigravity agent harness holding the chat (it *does* demand an API key, and its tooltip is what suggested the key theory) | fresh **New chat**, no agent panel | denied |
+| It's a content refusal — B1p describes a shirtless teenager | *"a red bodyboard lying flat on the sand"* | denied |
+
+Four hypotheses, four dead ends, so the remaining difference is the automation itself rather
+than anything about the account, the model, the mode, or the prompt. **Until that's
+understood, generate this batch by hand** and hand the JPGs over for conversion — the
+settings below still apply, and the conversion half of the pipeline is unaffected.
+
+**Run settings that make the prompts behave** (Playground → Run settings, right panel):
+
+| Setting | Value | Why |
+|---|---|---|
+| Model | Nano Banana 2 · `gemini-3.1-flash-image` | Lite is half the price but tuned for at-scale volume; character consistency is this batch's whole job |
+| Output format | **Images only** | The default "Images & text" spends output tokens narrating the picture |
+| Aspect ratio | **1:1** | Native control — see below |
+| Resolution | **1K** | Matches the 1024 px renders `pixelate_sprite.py` was tuned against; more pixels don't help pixel art |
+| Thinking level | Minimal | Default; no reason to raise it for a sprite |
+| Tools | remove Grounding with Google Search | On by default, useless here, and it bills |
+
+**Drop the Midjourney flags when prompting Gemini.** The prompts above end in
+`--ar 1:1 --no photorealism, blur, …` because this kit was written Midjourney-first. AI
+Studio has a real aspect-ratio control, and no negative-prompt field at all — so `--ar 1:1`
+is redundant and the `--no` list is read as *literal prompt text*, i.e. as things to draw.
+Rewrite the tail as a sentence before pasting:
+
+> …centered on a plain solid magenta background for easy cutout. **Do not include:
+> photorealism, blur, smooth shading, a sitting or upright pose, a standing surfer, a
+> surfboard, multiple figures, a grid or reference sheet, text, or a watermark.**
+
+The prompt bodies above are otherwise fine as-is. A converted B1p came out at 211 tokens.
+
+## Converting this batch
+
+**Size these by WIDTH, not height.** The lineup batch targeted ~36 px tall because those
+poses are upright; these are flat, so height is a bad handle — a 15 px-tall sprite has no
+precision left in it. Match the shared frames instead:
+
+| | Target | Reference |
+|---|---|---|
+| boarder paddle | ≈ 42 px wide (14–16 tall) | `spr_b_paddle.png` 42×15 |
+| surfer prone | ≈ 47 px wide (11–13 tall) | `spr_s_prone.png` 47×12 |
+
+**The commands that produced the shipped set** (2026-09-16). Three renders carried a clean
+100x100 lattice, three had none and needed `--grid 1024` — same split, and the same reasons,
+as the lineup batch:
+
+```sh
+# 100x100 lattice; tight per-colour tol on the sea, or his blue fins go with it
+python3 execution/pixelate_sprite.py --key-at 628,604,20 --scale 0.467 \
+  art-src/spr_b_paddle_n1.jpg assets/spr_b_paddle_n1.png
+# no lattice -> sample native
+python3 execution/pixelate_sprite.py --grid 1024 --key-at 88,580 --key-at 916,580 --scale 0.0445 \
+  art-src/spr_b_paddle_n2.jpg assets/spr_b_paddle_n2.png
+# key ONLY the blues: two of her "blue" clusters are the purple board
+python3 execution/pixelate_sprite.py --key-at 924,584 --key-at 956,576 --scale 0.4286 \
+  art-src/spr_b_paddle_n3.jpg assets/spr_b_paddle_n3.png
+python3 execution/pixelate_sprite.py --grid 1024 --key-at 664,448 --key-at 176,512 --scale 0.0478 \
+  art-src/spr_s_prone_n1.jpg assets/spr_s_prone_n1.png
+# --bg-tol 30 keeps her magenta suit from being read as the magenta background
+python3 execution/pixelate_sprite.py --bg-tol 30 --key-at 144,496 --key-at 148,484 --scale 0.4747 \
+  art-src/spr_s_prone_n2.jpg assets/spr_s_prone_n2.png
+python3 execution/pixelate_sprite.py --grid 1024 --key-at 636,420 --key-at 700,536 --scale 0.04855 \
+  art-src/spr_s_prone_n3.jpg assets/spr_s_prone_n3.png
+```
+
+Landed at 40-42 px wide (boarders) and 44-47 px (surfers), against `spr_b_paddle.png` 42x15
+and `spr_s_prone.png` 47x12.
+
+**Find the sea colours, don't eyeball them.** Scales come from each `--report` bbox
+(`target_width / bbox_width`), and the key coordinates from sampling the render for
+blue-dominant clusters — guessing coordinates off a thumbnail wastes re-runs. A throwaway
+script that dumps the top few bluish clusters with a representative (x,y) paid for itself
+immediately: it's what caught that B3's second-biggest "blue" cluster was her purple board.
+
+```sh
+python3 execution/pixelate_sprite.py --report art-src/spr_b_paddle_n1.jpg
+```
+
+Expect the same three traps the lineup batch hit, for the same reasons — the water is the
+problem every time:
+
+- **`--key-at` for the sea.** A horizontal pose is *mostly* waterline, so there's more
+  painted water here than in the lineup renders, not less. Budget for two or three keys:
+  deep water, surface highlight, ripple dashes.
+- **`--grid` if `--report` finds no lattice.** Faux-pixel renders have no regular blocks;
+  sample at native resolution and let `--scale` do the work.
+- **`--crop` if the waterline runs the full width.** Very likely on this pose — the figure
+  is horizontal, so a painted sea band sits right along it. Crop before keying.
+
+## Wiring them in
+
+Six `loadImg` lines are already in `src/scenes.js`, commented out directly under the lineup
+frames. Uncomment as each PNG lands — `localKey()` needs no change, it picks up
+`base + '_' + L.id` the moment `imgReady()` says yes, and silently keeps recolouring until
+then. Bump the `?v` on `scenes.js` + `main.js` after.
+
+## Judging this batch
+
+Everything in the checklist at the top of the file, plus:
+
+- **Same person as the lineup frame.** Open `spr_b_sit_n1.png` beside it. Same build, same
+  hair, same skin, same gear. This is the entire point of the batch — a paddle frame that
+  looks great but reads as somebody else is a failed render, not a stylistic variation.
+- **Horizontal, not sitting.** The most likely failure here: "paddling" pulls Gemini toward
+  the upright lineup pose it has seen six times already in this file.
+- **No board on the bodysurfers.** Still the second most likely failure.
+- **Flat and long.** If the figure sits small and square in the frame you'll be scaling up a
+  20 px-wide sprite next to a 42 px one. Re-roll rather than stretch.
+- **Silhouettes still differ.** Squint at the three boarders side by side with colour off.
+  If the grom and the veteran are the same shape lying down, the build didn't survive the
+  pose change and the batch hasn't actually bought you anything.

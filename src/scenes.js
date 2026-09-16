@@ -11,9 +11,18 @@ const W = 256, H = 240;
 // ---- Daily Wave helpers (Phase 2) --------------------------------------------
 // One seeded 10-wave run per UTC day, shareable as an emoji grid.
 const DAILY_EPOCH = Date.UTC(2026, 6, 1);   // 2026-07-01 = DAILY #1
-function dailyKey() {
-  const d = new Date();
+function keyFromMs(ms) {
+  const d = new Date(ms);
   return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+function dailyKey() { return keyFromMs(Date.now()); }
+function keyForDay(n) { return keyFromMs(DAILY_EPOCH + (n - 1) * 86400000); }
+// Time left on today's wave — the reason to come back is only obvious if it's ticking.
+function untilNextWave() {
+  const d = new Date();
+  const ms = 86400000 - (Date.now() - Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return h > 0 ? `${h}H ${m}M` : `${m}M`;
 }
 function dailyNum() {
   const d = new Date();
@@ -22,6 +31,12 @@ function dailyNum() {
 }
 function loadDaily() { try { return JSON.parse(localStorage.getItem('wedge-daily') || 'null'); } catch { return null; } }
 function saveDaily(rec) { try { localStorage.setItem('wedge-daily', JSON.stringify(rec)); } catch { /* private mode */ } }
+// Days in a row. The record only ever holds today's run, so the streak is carried
+// forward from it: yesterday's record extends the run, anything older starts over.
+function nextStreak(dayNum) {
+  const prev = loadDaily();
+  return prev && prev.date === keyForDay(dayNum - 1) ? (prev.streak || 1) + 1 : 1;
+}
 // per-wave outcome codes → share emoji + on-canvas swatch colour
 const GRID_EMOJI = { slot: '🟩', clean: '🟦', late: '🟨', wipe: '🟥', waste: '⬜', good: '🧠' };
 const GRID_COLOR = { slot: '#4cc94c', clean: '#4c9cf8', late: '#f8d848', wipe: '#f85838', waste: '#e8e8f0', good: '#b8a8f8' };
@@ -33,7 +48,7 @@ function newDailyRand() { return mulberry32(hashStr(dailyKey())); }
 // Preloaded background art (Midjourney-derived, served from ./assets/ by serve.py).
 // Scenes draw these when loaded and fall back to procedural rendering until then.
 const IMG = {};
-function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=20'; IMG[key] = i; }
+function loadImg(key, file) { const i = new Image(); i.src = './assets/' + file + '?v=21'; IMG[key] = i; }
 function imgReady(key) { const i = IMG[key]; return i && i.complete && i.naturalWidth > 0; }
 loadImg('title', 'title.png');
 loadImg('select', 'select.png');
@@ -121,6 +136,16 @@ loadImg('sp_b_sit_n3', 'spr_b_sit_n3.png');
 loadImg('sp_s_tread_n1', 'spr_s_tread_n1.png');
 loadImg('sp_s_tread_n2', 'spr_s_tread_n2.png');
 loadImg('sp_s_tread_n3', 'spr_s_tread_n3.png');
+// Paddle pose, per identity — without these a local changed person the moment the pack went
+// prone, which is the one transition where you're watching all three at once. The surfer's
+// prone frame is both his paddle AND his ride, so those three fix two poses each. Boarder
+// drop/ride are still recolour-only: one rider, ~1s, much harder to catch.
+loadImg('sp_b_paddle_n1', 'spr_b_paddle_n1.png');
+loadImg('sp_b_paddle_n2', 'spr_b_paddle_n2.png');
+loadImg('sp_b_paddle_n3', 'spr_b_paddle_n3.png');
+loadImg('sp_s_prone_n1', 'spr_s_prone_n1.png');
+loadImg('sp_s_prone_n2', 'spr_s_prone_n2.png');
+loadImg('sp_s_prone_n3', 'spr_s_prone_n3.png');
 
 // Phase 3 rider identity: the sponger holds a wider pocket for steady points; the
 // bodysurfer works a tighter pocket but scores harder in the tube and off the exit.
@@ -346,7 +371,19 @@ export function makeScenes(game) {
   const title = {
     t: 0,
     // the bed keeps running under the menus — you're on the sand, not in a void
-    enter() { this.t = 0; this.menu = 0; audio.stopMusic(); audio.ambient(0.09); },
+    enter() {
+      this.t = 0; this.menu = 0; audio.stopMusic(); audio.ambient(0.09);
+      // Cache today's daily record once per visit — the menu reads it every frame.
+      const rec = loadDaily();
+      this.dayNum = dailyNum();
+      this.played = rec && rec.date === dailyKey() ? rec : null;
+    },
+    // What the highlighted mode actually is, said before you spend the attempt.
+    modeLines(pick) {
+      if (pick === 0) return ['ENDLESS · RANDOM WAVES', 'CHASE THE HI-SCORE'];
+      if (this.played) return [`DAILY #${this.dayNum} DONE · ${this.played.score.toLocaleString()}`, `SEE YOUR RESULT · NEXT IN ${untilNextWave()}`];
+      return [`TODAY IS #${this.dayNum} · SAME WAVES FOR EVERYONE`, 'ONE TRY · 10 WAVES · NO FREE FALLS'];
+    },
     // ARCADE = endless seeded-by-Math.random run; DAILY WAVE = today's shared 10-wave seed
     startMode(pick) {
       audio.ensure(); audio.select();
@@ -398,11 +435,17 @@ export function makeScenes(game) {
       const mk = (s, x, on) => text(ctx, on && blink ? `▸${s}◂` : s, x, 168, 9, on ? '#f8f848' : '#c8c8d8', 'center');
       mk('ARCADE', W / 2 - 58, this.menu === 0);
       mk('DAILY WAVE', W / 2 + 52, this.menu === 1);
-      text(ctx, input.usedTouch ? 'TAP A MODE TO START' : '←→ CHOOSE · X START', W / 2, 182, 7, '#fff', 'center');
-      text(ctx, 'KEYS: ←→ MOVE · X GO · ↑↓ TUBE · Z STANCE · P PAUSE · M MUSIC', W / 2, 198, 7, '#e8e8e8', 'center');
-      text(ctx, 'TOUCH: DRAG TO MOVE · TAP TO GO', W / 2, 207, 7, '#e8e8e8', 'center');
+      // what the highlighted mode is — the pitch has to land before you pick
+      const sub = this.modeLines(this.menu);
+      text(ctx, sub[0], W / 2, 180, 7, this.menu === 1 ? '#f8d848' : '#c8e8f8', 'center');
+      text(ctx, sub[1], W / 2, 189, 7, '#c8c8d8', 'center');
+      text(ctx, input.usedTouch ? 'TAP A MODE TO START' : '←→ CHOOSE · X START', W / 2, 200, 7, '#fff', 'center');
+      // one control line, whichever input they're actually using — the second freed a row
+      text(ctx, input.usedTouch ? 'DRAG TO MOVE · TAP TO GO'
+        : '←→ MOVE · X GO · ↑↓ TUBE · Z STANCE · P PAUSE · M MUSIC',
+        W / 2, 210, 7, '#e8e8e8', 'center');
       const hs = loadScores();
-      text(ctx, `HI ${String(hs.length ? hs[0].score : 0).padStart(6, '0')} ${hs.length ? hs[0].initials : '---'}`, W / 2, 216, 8, '#f8d848', 'center');
+      text(ctx, `HI ${String(hs.length ? hs[0].score : 0).padStart(6, '0')} ${hs.length ? hs[0].initials : '---'}`, W / 2, 220, 8, '#f8d848', 'center');
       if (audio.musicMuted) text(ctx, '♪ OFF', W - 6, 5, 7, '#a8a8b8', 'right');
     },
   };
@@ -445,6 +488,11 @@ export function makeScenes(game) {
         skyAndSea(ctx, PALETTES[0]);
         text(ctx, 'SELECT YOUR RIDER', W / 2, 22, 12, '#f8f8f8', 'center');
       }
+      // daily runs are one-shot — say so while the rider choice is still reversible
+      if (game.daily && !this.confirming) {
+        ctx.fillStyle = 'rgba(8,8,24,0.72)'; ctx.fillRect(0, 30, W, 10);
+        text(ctx, `DAILY #${dailyNum()} · ONE RUN TODAY`, W / 2, 31, 8, '#f8d848', 'center');
+      }
       if (this.confirming) {
         // punch-zoom the chosen rider forward against a dimmed screen — the "movement"
         const b = SEL_PANELS[this.pick];
@@ -457,6 +505,11 @@ export function makeScenes(game) {
         ctx.strokeStyle = Math.floor(this.t * 14) % 2 === 0 ? '#ffffff' : '#f8f848';
         ctx.lineWidth = 3; ctx.strokeRect(cx - dw / 2, cy - dh / 2, dw, dh);
         text(ctx, RIDERS[this.pick].name, W / 2, 22, 11, '#f8f848', 'center');
+        // the stakes, on the last beat before the drop — daily has no safety net
+        if (game.daily) {   // plate: the zoomed panel behind this is bright art
+          ctx.fillStyle = 'rgba(8,8,24,0.78)'; ctx.fillRect(0, H - 32, W, 11);
+          text(ctx, `DAILY #${dailyNum()} · ONE RUN · NO FREE FALLS`, W / 2, H - 30, 8, '#f8d848', 'center');
+        }
         text(ctx, 'DROPPING IN...', W / 2, H - 18, 9, '#fff', 'center');
         return;
       }
@@ -1737,7 +1790,9 @@ export function makeScenes(game) {
         ctx.fillStyle = 'rgba(8,8,32,0.72)';
         ctx.fillRect(20, 100, W - 40, 42);
         text(ctx, 'WATCH THE REPLAY?', W / 2, 106, 11, '#f8f8f8', 'center');
-        text(ctx, input.usedTouch ? 'TAP = YES        (WAIT = SKIP)' : 'X = YES        ↓ = SKIP', W / 2, 124, 8, '#f8d848', 'center');
+        // Z is the back-out key everywhere else, so it's the one worth naming here;
+        // ↓ and ENTER still skip for anyone who already had the habit.
+        text(ctx, input.usedTouch ? 'TAP = YES        (WAIT = SKIP)' : 'X = YES        Z = SKIP', W / 2, 124, 8, '#f8d848', 'center');
       } else {
         text(ctx, input.usedTouch ? 'TAP TO SKIP' : 'X TO SKIP', W / 2, H - 13, 7, '#c8c8d8', 'center');
       }
@@ -2707,10 +2762,12 @@ export function makeScenes(game) {
       if (opts.stored) {                       // opened from the title for an already-played day
         this.grid = opts.stored.grid || [];
         this.score = opts.stored.score || 0;
+        this.streak = opts.stored.streak || 1;
       } else {                                 // fresh finish — record the one attempt for today
         this.grid = (game.dailyGrid || []).slice();
         this.score = Math.floor(game.score);
-        saveDaily({ date: opts.dateKey || dailyKey(), grid: this.grid, score: this.score });
+        this.streak = nextStreak(this.dayNum);  // must read the old record before overwriting it
+        saveDaily({ date: opts.dateKey || dailyKey(), grid: this.grid, score: this.score, streak: this.streak });
       }
       audio.jingle();
     },
@@ -2726,16 +2783,22 @@ export function makeScenes(game) {
       this.t += dt;
       this.copied = Math.max(0, this.copied - dt);
       if (this.t < 0.5) return;
-      if (input.pressed('a') || input.pressed('start')) {
-        if (!this.copiedOnce) this.copy();     // first press copies the result
-        else game.goto('title');               // then returns to the menu
+      // X copies (repeatable — the share block is the point), Z/ENTER leaves. Touch has
+      // only the one gesture, so there a second tap after the copy is the way out.
+      if (input.pressed('b') || input.pressed('start')) { game.goto('title'); return; }
+      if (input.pressed('a')) {
+        if (input.usedTouch && this.copiedOnce) game.goto('title');
+        else this.copy();
       }
     },
     draw(ctx) {
       skyAndSea(ctx, PALETTES[3]);             // maxing-sunset backdrop
       ctx.fillStyle = 'rgba(8,8,28,0.6)'; ctx.fillRect(18, 28, W - 36, 184);
       text(ctx, `WEDGE! DAILY #${this.dayNum}`, W / 2, 42, 12, '#f8d848', 'center');
-      text(ctx, `SCORE ${this.score.toLocaleString()}`, W / 2, 66, 10, '#fff', 'center');
+      text(ctx, `SCORE ${this.score.toLocaleString()}`, W / 2, 62, 10, '#fff', 'center');
+      // days in a row — the clearest statement of what the mode is for
+      const st = this.streak > 1 ? `${this.streak} DAYS IN A ROW` : 'DAY 1 OF YOUR STREAK';
+      text(ctx, st, W / 2, 76, 8, this.streak > 1 ? '#8ce8a0' : '#c8c8d8', 'center');
       // per-wave grid of swatches (colours mirror the copied emoji)
       const n = this.grid.length, sz = 16, gap = 3, tot = n * sz + Math.max(0, n - 1) * gap;
       const gx = Math.round(W / 2 - tot / 2), gy = 92;
@@ -2749,13 +2812,14 @@ export function makeScenes(game) {
       text(ctx, 'GREEN SLOT · BLUE CLEAN · YELLOW LATE', W / 2, 120, 6, '#c8c8d8', 'center');
       text(ctx, 'RED WIPE · WHITE PASS · PURPLE GOOD CALL', W / 2, 128, 6, '#c8c8d8', 'center');
       if (this.copied > 0) {
-        text(ctx, this.copyMsg, W / 2, 152, 10, this.copyMsg === 'COPIED!' ? '#58e058' : '#f8d848', 'center');
+        text(ctx, this.copyMsg, W / 2, 146, 10, this.copyMsg === 'COPIED!' ? '#58e058' : '#f8d848', 'center');
       } else if (Math.floor(this.t * 2) % 2) {
-        text(ctx, input.usedTouch ? 'TAP TO COPY RESULT' : 'X = COPY RESULT', W / 2, 152, 9, '#fff', 'center');
+        text(ctx, input.usedTouch ? 'TAP TO COPY RESULT' : 'X = COPY RESULT', W / 2, 146, 9, '#fff', 'center');
       }
-      if (this.copiedOnce && Math.floor(this.t * 2) % 2) {
-        text(ctx, input.usedTouch ? 'TAP AGAIN FOR MENU' : 'X AGAIN FOR MENU', W / 2, 172, 8, '#c8c8d8', 'center');
-      }
+      // exit is its own key now — X kept copying people out of the screen by accident
+      text(ctx, input.usedTouch ? (this.copiedOnce ? 'TAP AGAIN FOR MENU' : '') : 'Z = MENU',
+        W / 2, 162, 8, '#c8c8d8', 'center');
+      text(ctx, `NEXT WAVE IN ${untilNextWave()}`, W / 2, 180, 8, '#f8d848', 'center');
       text(ctx, 'ONE WAVE A DAY · SAME FOR EVERYONE', W / 2, 196, 7, '#e8e8f0', 'center');
     },
   };
