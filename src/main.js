@@ -1,8 +1,8 @@
 // Boot + fixed-timestep game loop at NES-native 256x240, integer-scaled.
 // ?v= querystrings bust stale module caches on phones; bump together in all files
-import { input, MUTE_RECT } from './input.js?v=6';
+import { input, MUTE_RECT, PAUSE_RECT, inRect } from './input.js?v=7';
 import { audio } from './audio.js?v=7';
-import { makeScenes } from './scenes.js?v=52';
+import { makeScenes } from './scenes.js?v=55';
 
 const W = 256, H = 240;
 
@@ -44,13 +44,38 @@ const game = {
 
 // pause is event-driven (not in the frame loop) so it always responds
 let paused = false;
+function setPaused(v) {
+  paused = v;
+  if (paused) audio.pauseAll(); else audio.resumeAll();
+}
+// Quit is only offered mid-run — there's nothing to abandon on the title or the briefing.
+function inRun() { return game.sceneName === 'surf' || game.sceneName === 'wipeout'; }
+// Ending a run early still resolves it properly: an arcade score can still make the table,
+// and a daily run records what you actually did. Quitting a daily SPENDS the attempt, which
+// is the point — otherwise a bad daily could be quit-scummed away.
+function quitRun() {
+  setPaused(false);
+  if (game.daily) game.goto('dailyresult', {});
+  else game.goto('gameover');
+}
+// pause-menu buttons, laid out here because the overlay is drawn here too
+const RESUME_RECT = { x: 40, y: 138, w: 80, h: 24 };
+const QUIT_RECT = { x: 136, y: 138, w: 80, h: 24 };
 addEventListener('keydown', (e) => {
-  if (e.code === 'KeyP' && !e.repeat) {
-    paused = !paused;
-    if (paused) audio.pauseAll();
-    else audio.resumeAll();
-  }
+  if (e.code === 'KeyP' && !e.repeat) setPaused(!paused);
+  else if (e.code === 'KeyQ' && !e.repeat && paused && inRun()) quitRun();
 });
+// Touch/click routing for pause. Registered on input so it runs on the event, not in the
+// frame loop — which is stopped while paused.
+input.onTap = (p) => {
+  if (paused) {
+    if (inRect(p, RESUME_RECT)) { setPaused(false); return true; }
+    if (inRect(p, QUIT_RECT) && inRun()) { quitRun(); return true; }
+    return true;            // swallow stray taps so they can't reach the game underneath
+  }
+  if (inRun() && inRect(p, PAUSE_RECT)) { setPaused(true); return true; }
+  return false;
+};
 
 const scenes = makeScenes(game);
 // debug/test handle (harmless in prod; no gameplay reads it)
@@ -60,6 +85,17 @@ game.goto('title');
 
 // on-screen master-mute toggle (works on touch + mouse; keyboard M still toggles music).
 // Hit region lives in input.js (MUTE_RECT); this only draws it, on top of every scene.
+// the pause button — two bars, same visual weight as the speaker so the pair reads as a set
+function drawPause(ctx) {
+  if (!inRun() || paused) return;
+  const r = PAUSE_RECT;
+  ctx.fillStyle = 'rgba(8,8,32,0.5)';
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = '#f8f8f8';
+  ctx.fillRect(r.x + 5, r.y + 4, 4, 10);
+  ctx.fillRect(r.x + 11, r.y + 4, 4, 10);
+}
+
 function drawMute(ctx) {
   const r = MUTE_RECT;
   ctx.fillStyle = 'rgba(8,8,32,0.5)';
@@ -103,7 +139,26 @@ function frame(now) {
     ctx.fillStyle = '#f8f8f8';
     ctx.fillText('PAUSED', W / 2, 96);
     ctx.font = "bold 8px 'Courier New', monospace";
-    ctx.fillText('PRESS P TO RESUME', W / 2, 126);
+    ctx.fillText(input.usedTouch ? 'TAP A BUTTON' : 'P RESUMES', W / 2, 126);
+    // two real targets, so touch gets resume AND quit without a hidden gesture
+    const btn = (r, label, on, colour) => {
+      ctx.fillStyle = on ? colour : 'rgba(40,40,60,0.9)';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = on ? '#f8f8f8' : '#585868';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+      ctx.font = "bold 10px 'Courier New', monospace";
+      ctx.fillStyle = on ? '#fff' : '#787888';
+      ctx.fillText(label, r.x + r.w / 2, r.y + 7);
+    };
+    btn(RESUME_RECT, 'RESUME', true, 'rgba(40,120,60,0.95)');
+    btn(QUIT_RECT, 'QUIT', inRun(), 'rgba(150,50,40,0.95)');
+    if (inRun()) {
+      ctx.font = "bold 7px 'Courier New', monospace";
+      ctx.fillStyle = '#c8c8d8';
+      ctx.fillText(game.daily ? 'QUIT ENDS YOUR DAILY ATTEMPT'
+        : (input.usedTouch ? 'QUIT ENDS THE RUN' : 'QUIT ENDS THE RUN · Q'), W / 2, 168);
+    }
     drawMute(ctx);
     requestAnimationFrame(frame);
     return;
@@ -116,6 +171,7 @@ function frame(now) {
     acc -= STEP;
   }
   scene.draw(ctx);
+  drawPause(ctx);
   drawMute(ctx);
   requestAnimationFrame(frame);
 }

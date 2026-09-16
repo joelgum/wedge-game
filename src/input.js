@@ -5,10 +5,13 @@ import { audio } from './audio.js?v=7';
 // on-screen master-mute button (bottom-right corner, canvas coords). Drawn in main.js;
 // hit-tested here so a tap on it toggles audio instead of counting as the A button.
 export const MUTE_RECT = { x: 234, y: 221, w: 20, h: 18 };
-function inMute(p) {
-  const r = MUTE_RECT;
+// on-screen PAUSE button, bottom-LEFT so it mirrors the speaker without colliding with the
+// score (top-right) or the hearts (top-left). Only drawn during a run — see main.js.
+export const PAUSE_RECT = { x: 2, y: 221, w: 20, h: 18 };
+export function inRect(p, r) {
   return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
 }
+function inMute(p) { return inRect(p, MUTE_RECT); }
 
 const KEYMAP = {
   ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
@@ -23,6 +26,11 @@ export const input = {
   // and pull back are the same gesture; a caller that must not accept the SAME press twice
   // compares this against the value it saw when it consumed the first one.
   aSeq: 0,
+  // Tap interceptor, set by main.js. Called with canvas coords for every tap/click before
+  // the mute check and the default A press; returning true consumes the tap. This is how the
+  // pause button and the pause menu get touch without inventing a gesture that would fight
+  // drag-to-steer — and without the loop, which doesn't run while paused.
+  onTap: null,
   pressed(k) { return !!this.hit[k]; },
   held(k) { return !!this.down[k]; },
   endFrame() { this.hit = {}; },
@@ -100,7 +108,10 @@ function touchEnd(e, cancelled) {
     input.touch.dx = 0; input.touch.dy = 0;
     // quick tap without dragging = A button — unless it landed on the mute button
     if (!cancelled && tapStart && !tapStart.moved && performance.now() - tapStart.time < 500) {
-      if (inMute(canvasPos({ clientX: tapStart.x, clientY: tapStart.y }))) {
+      const tp = canvasPos({ clientX: tapStart.x, clientY: tapStart.y });
+      if (input.onTap && input.onTap(tp)) {
+        // consumed by the pause button or the pause menu
+      } else if (inMute(tp)) {
         audio.ensure(); audio.toggleMute();
       } else {
         input.press('a');
@@ -118,7 +129,7 @@ addEventListener('touchcancel', (e) => touchEnd(e, true), { passive: false });
 
 // desktop: the mute button is clickable too (keyboard still has M for music-only)
 addEventListener('mousedown', (e) => {
-  if (inMute(canvasPos({ clientX: e.clientX, clientY: e.clientY }))) {
-    e.preventDefault(); audio.ensure(); audio.toggleMute();
-  }
+  const p = canvasPos({ clientX: e.clientX, clientY: e.clientY });
+  if (input.onTap && input.onTap(p)) { e.preventDefault(); return; }
+  if (inMute(p)) { e.preventDefault(); audio.ensure(); audio.toggleMute(); }
 });

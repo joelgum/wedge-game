@@ -1,6 +1,6 @@
 // Game scenes. v2 loop: TITLE → SURF (one continuous view: watch → commit → tube ride)
 // → WIPEOUT on mistakes → GAMEOVER. No paddle-out; you start in the lineup.
-import { input } from './input.js?v=6';
+import { input } from './input.js?v=7';
 import { audio } from './audio.js?v=7';
 import { drawMap, drawHeart, MAPS } from './sprites.js?v=3';
 import { loadScores, saveScore, qualifies } from './score.js?v=3';
@@ -480,7 +480,9 @@ export function makeScenes(game) {
         if (this.confT <= 0) {
           game.rider = RIDERS[this.pick].id;
           game.reset();
-          game.goto('surf');
+          // the briefing sits between the pick and the lineup — arcade only, since a daily
+          // player is a repeat player by definition and it'd be noise on the one attempt
+          game.goto(game.daily ? 'surf' : 'brief');
         }
         return;
       }
@@ -1746,7 +1748,13 @@ export function makeScenes(game) {
     updateReplayPrompt(dt) {
       this.promptT += dt;
       if (this.promptT < 0.35) return;   // brief guard so a lingering tap/press isn't consumed
-      if (input.pressed('a')) { this.startReplay(); return; }
+      // Touch has one button, so the screen is the choice: left half skips, right half
+      // watches. Without this a phone player could only decline by waiting the prompt out.
+      if (input.pressed('a')) {
+        if (input.usedTouch && input.touch.x && input.touch.x < W / 2) this.finishReplay();
+        else this.startReplay();
+        return;
+      }
       if (input.pressed('b') || input.pressed('down') || input.pressed('start') || this.promptT > 8) {
         this.finishReplay();
       }
@@ -1806,7 +1814,7 @@ export function makeScenes(game) {
         text(ctx, 'WATCH THE REPLAY?', W / 2, 106, 11, '#f8f8f8', 'center');
         // Z is the back-out key everywhere else, so it's the one worth naming here;
         // ↓ and ENTER still skip for anyone who already had the habit.
-        text(ctx, input.usedTouch ? 'TAP = YES        (WAIT = SKIP)' : 'X = YES        Z = SKIP', W / 2, 124, 8, '#f8d848', 'center');
+        text(ctx, input.usedTouch ? 'TAP LEFT = SKIP   ·   TAP RIGHT = WATCH' : 'X = YES        Z = SKIP', W / 2, 124, 7, '#f8d848', 'center');
       } else {
         text(ctx, input.usedTouch ? 'TAP TO SKIP' : 'X TO SKIP', W / 2, H - 13, 7, '#c8c8d8', 'center');
       }
@@ -2527,8 +2535,8 @@ export function makeScenes(game) {
         text(ctx, input.usedTouch ? 'SLIDE ↑↓ ANYWHERE TO STEER' : '↑↓ STAY BETWEEN THE LINES', W / 2, 214, 8, '#f8f890', 'center');
         // same three zones for both riders, different moves in the top one
         const hint = game.rider === 'surfer'
-          ? (input.usedTouch ? 'TAP HIGH=TUBE ELSE=ROLL · HOLD=LAY-BACK' : 'X HIGH=TUBE ELSE=ROLL · Z=LAY-BACK')
-          : (input.usedTouch ? 'TAP HIGH=AIR ELSE=SPIN · HOLD=KNEE DROP' : 'X HIGH=AIR ELSE=SPIN · Z=KNEE DROP');
+          ? (input.usedTouch ? 'TAP HIGH=TUBE ELSE=ROLL · HOLD=LAY-BACK' : 'X HIGH=TUBE ELSE=ROLL · HOLD Z=LAY-BACK')
+          : (input.usedTouch ? 'TAP HIGH=AIR ELSE=SPIN · HOLD=KNEE DROP' : 'X HIGH=AIR ELSE=SPIN · HOLD Z=KNEE DROP');
         text(ctx, hint, W / 2, 225, 7, '#8ce8a0', 'center');
       } else if (this.buried > 0.3 && Math.floor(this.animT * 4) % 2) {
         text(ctx, this.py > pyT ? 'GO UP ↑' : 'GO DOWN ↓', W / 2, 224, 9, '#f85838', 'center');
@@ -2838,5 +2846,115 @@ export function makeScenes(game) {
     },
   };
 
-  return { title, select, surf, wipeout, gameover, dailyresult };
+  // ---------------------------------------------------------------- BRIEF (how to play)
+  // Sits between the rider pick and the lineup, arcade only. The whole trick tutorial used
+  // to be one 7px line during the first 3.2s of a ride, which never had room for the rules
+  // that actually cost you points — that the stance must be HELD, that Z ignores the zone
+  // map, that tricks chain. Here the chosen rider demos his own three moves on a loop, at
+  // the band height that triggers each one, so the zone map is shown rather than described.
+  const BRIEF_ARM = 0.25;    // swallows a stray press carried over from the select screen
+  const brief = {
+    // one demo per move, in the order the zone map reads top-to-bottom
+    moves() {
+      const top = game.rider === 'surfer' ? 'tube' : 'air';
+      return [
+        { kind: top, key: 'X', zone: 'TOP OF THE BAND', rel: -0.62, dur: 1.5 },
+        { kind: 'spin', key: 'X', zone: 'ANYWHERE ELSE', rel: 0.05, dur: 1.5 },
+        { kind: 'stance', key: 'Z', zone: 'HOLD IT — ANY HEIGHT', rel: 0.55, dur: 2.2 },
+      ];
+    },
+    enter() { this.t = 0; this.i = 0; this.mt = 0; audio.ensure(); },
+    update(dt) {
+      this.t += dt;
+      this.mt += dt;
+      if (this.mt >= this.moves()[this.i].dur) { this.mt = 0; this.i = (this.i + 1) % 3; audio.blip(); }
+      if (this.t < BRIEF_ARM) return;
+      if (input.pressed('a') || input.pressed('b') || input.pressed('start')
+          || input.pressed('up') || input.pressed('down') || input.pressed('left') || input.pressed('right')) {
+        audio.select();
+        game.goto('surf');
+      }
+    },
+    draw(ctx) {
+      const p = PALETTES[0];
+      skyAndSea(ctx, p);
+      const m = this.moves()[this.i], prog = this.mt / m.dur;
+      text(ctx, RIDERS[game.rider === 'surfer' ? 1 : 0].name, W / 2, 5, 9, '#fff', 'center');
+
+      // ---- demo panel: a slice of wave face with the pocket band drawn on it ----
+      const PX = 4, PY = 16, PW = W - 8, PH = 112;
+      for (let i = 0; i < PH; i += 2) {
+        ctx.fillStyle = shade(p.sea, -0.34 + (i / PH) * 0.6);
+        ctx.fillRect(PX, PY + i, PW, 2);
+      }
+      ctx.strokeStyle = 'rgba(8,12,32,0.8)'; ctx.lineWidth = 1;
+      ctx.strokeRect(PX + 0.5, PY + 0.5, PW - 1, PH - 1);
+      // the two lines you must stay between — same yellow the ride uses for the band
+      const bandY = PY + PH * 0.6, bandH = 30;
+      ctx.fillStyle = '#f8f890';
+      for (let x = PX + 3; x < PX + PW - 3; x += 6) {
+        ctx.fillRect(x, Math.round(bandY - bandH / 2), 4, 1);
+        ctx.fillRect(x, Math.round(bandY + bandH / 2), 4, 1);
+      }
+      ctx.fillStyle = 'rgba(8,12,32,0.6)'; ctx.fillRect(PX + 1, Math.round(bandY + bandH / 2) + 3, 116, 9);
+      text(ctx, 'THE POCKET — STAY IN IT', PX + 4, Math.round(bandY + bandH / 2) + 4, 7, '#f8f890');
+
+      // ---- the rider, at the height that triggers this move, doing the move ----
+      const rx = PX + PW * 0.68, ry = bandY + m.rel * bandH;
+      const key = trickArt(m.kind, riderKey(m.kind === 'stance' ? 'ride' : 'drop'));
+      if (m.kind === 'spin') {
+        const turn = prog * Math.PI * 2;   // boarder pivots flat; bodysurfer rolls long-axis
+        if (game.rider === 'surfer') drawRollImg(ctx, key, rx, ry, turn);
+        else drawRiderImg(ctx, key, rx, ry, turn);
+      } else if (m.kind === 'air') {
+        drawRiderImg(ctx, key, rx, ry - Math.sin(prog * Math.PI) * 14, -0.25);
+      } else {
+        drawRiderImg(ctx, key, rx, ry, m.kind === 'stance' ? 0.1 : -0.15);
+      }
+      // hold meter — the stance is the one move whose rule you cannot see while playing
+      if (m.kind === 'stance') {
+        const held = Math.min(1, prog * 1.9);
+        ctx.fillStyle = '#181828'; ctx.fillRect(rx - 16, ry - 24, 32, 4);
+        ctx.fillStyle = held >= 1 ? '#8ce8a0' : '#f8d848';
+        ctx.fillRect(rx - 16, ry - 24, Math.round(32 * held), 4);
+        if (held >= 1 && Math.floor(this.t * 6) % 2) text(ctx, 'SET!', rx, ry - 35, 8, '#8ce8a0', 'center');
+      }
+
+      // ---- the move's name + how you got it, on a plate so it clears the face ----
+      ctx.fillStyle = 'rgba(8,12,32,0.78)'; ctx.fillRect(PX + 1, PY + 1, 142, 32);
+      text(ctx, TRICKS[game.rider][m.kind], PX + 5, PY + 4, 14, '#8ce8a0');
+      text(ctx, `${m.key} · ${m.zone}`, PX + 5, PY + 21, 7, '#fff');
+      // three pips: exactly three moves, and which one you're watching
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i === this.i ? '#8ce8a0' : 'rgba(255,255,255,0.35)';
+        ctx.fillRect(PX + 5 + i * 8, PY + 36, 6, 3);
+      }
+
+      // ---- the rest of the run, in the order you meet it ----
+      const touch = input.usedTouch;
+      ctx.fillStyle = 'rgba(8,10,28,0.72)'; ctx.fillRect(0, PY + PH + 3, W, H - (PY + PH + 3));
+      const rows = [
+        ['TAKE OFF', touch ? 'SLIDE UNDER THE MARKER · TAP TO GO' : '←→ UNDER THE MARKER · X TO GO'],
+        ['SECOND THOUGHTS', touch ? 'TAP AGAIN INSIDE 1.5s — FREE' : 'X AGAIN INSIDE 1.5s — NO PENALTY'],
+        ['HIS WAVE', 'DEEPER RIDER HAS IT — LET IT GO, +150'],
+        ['STEER', touch ? 'SLIDE ↑↓ ANYWHERE ON SCREEN' : '↑↓ TO CLIMB AND DROP IN THE POCKET'],
+        ['CHAIN THEM', 'TRICKS BACK TO BACK SCORE UP TO x2.4'],
+      ];
+      let y = PY + PH + 9;
+      rows.forEach(([k, v]) => {
+        text(ctx, k, 7, y, 7, '#f8d848');
+        text(ctx, v, W - 7, y, 7, '#e8e8f0', 'right');
+        y += 11;
+      });
+      text(ctx, touch ? '❚❚ BOTTOM-LEFT = PAUSE & QUIT · ♪ BOTTOM-RIGHT = SOUND' : 'P PAUSE · Q QUIT (PAUSED) · M SOUND',
+        W / 2, y + 3, 7, '#a8b8c8', 'center');
+
+      // ---- get out of here ----
+      if (Math.floor(this.t * 2) % 2) {
+        text(ctx, touch ? 'TAP ANYWHERE TO DROP IN' : 'ANY KEY TO DROP IN', W / 2, H - 13, 9, '#fff', 'center');
+      }
+    },
+  };
+
+  return { title, select, brief, surf, wipeout, gameover, dailyresult };
 }
