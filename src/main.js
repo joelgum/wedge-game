@@ -2,7 +2,7 @@
 // ?v= querystrings bust stale module caches on phones; bump together in all files
 import { input, MUTE_RECT, PAUSE_RECT, inRect } from './input.js?v=8';
 import { audio } from './audio.js?v=7';
-import { makeScenes } from './scenes.js?v=56';
+import { makeScenes } from './scenes.js?v=57';
 
 const W = 256, H = 240;
 
@@ -31,13 +31,16 @@ const game = {
   streak: 0,
   // Phase 4: one rideable BOMB monster per arcade session (the clip moment).
   bombUsed: false,
+  // Has a too-big wave shown up yet this run? Drives the pity rule in surf.newWave() —
+  // the 10% roll alone leaves ~55% of 10-wave daily runs never seeing one (measured).
+  monsterSeen: false,
   // Phase 2 Daily Wave: mode flag, wave RNG (seeded for daily), and the per-wave grid.
   // These are set by the title menu and survive reset() — reset() only clears the run.
   daily: false, rand: Math.random, dailyGrid: [],
   reset() {
     this.lives = 3; this.score = 0; this.stage = 0; this.wave = 0; this.made = 0;
     this.taughtMakeable = false; this.taughtCloseout = false; this.freeFallUsed = false;
-    this.streak = 0; this.bombUsed = false;
+    this.streak = 0; this.bombUsed = false; this.monsterSeen = false;
   },
   goto(name, arg) { this.sceneName = name; scene = scenes[name]; scene.enter(game, arg || {}); },
 };

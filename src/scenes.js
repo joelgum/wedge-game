@@ -595,10 +595,14 @@ export function makeScenes(game) {
       if (game.daily) game.stage = Math.min(3, Math.floor((game.wave - 1) / 3));
       const st = game.stage;
       const rand = game.rand || Math.random;
+      // Kept rather than consumed inline: a normal wave in the top fifth of its stage's
+      // height range is a big one, and the lineup calls those out too (see updateWatch).
+      const aRoll = rand();
       this.wv = {
         t: 0,
         T: Math.max(6.5, 10 - st),                       // build-up time: room to read + position
-        A: Math.min(116, 78 + st * 12 + rand() * 16),    // face height — most of the screen by sunset
+        A: Math.min(116, 78 + st * 12 + aRoll * 16),     // face height — most of the screen by sunset
+        big: aRoll > 0.8,
         peak: 50 + rand() * 120,
         drift: (rand() < 0.5 ? -1 : 1) * (8 + rand() * 12 + st * 5),
         // stage 2+: the wedge backwash flips the peak's direction once mid-build
@@ -609,8 +613,21 @@ export function makeScenes(game) {
       // rare trap: a makeable-LOOKING wave that's simply too big to make. It feathers
       // like a catchable one, but it's abnormally tall — the size is the only tell.
       // Commit and you're pitched over the falls; read it and let it go for a bonus.
-      if (this.wv.makeable && rand() < 0.1) {
+      // Pity rule: the 10% roll is rare enough (net ~1 wave in 17, and rarer as the stages
+      // climb) that a whole 10-wave daily run has a ~55% chance of never showing one —
+      // which makes both the too-big read and the OUT DA BACK! callout feel absent rather
+      // than rare. So once a run is this far in with no monster yet, the next wave is one.
+      // Deterministic, so a seeded daily still deals every player the same set. It forces
+      // makeable too, since a monster is by definition a makeable-LOOKING wave.
+      const owed = !game.monsterSeen && game.wave >= (game.daily ? 7 : 6);
+      // rolled is drawn unconditionally so the seeded daily stream advances the same number
+      // of steps whether the pity rule fired or not
+      const rolled = rand() < 0.1;
+      if (owed) this.wv.makeable = true;
+      if (this.wv.makeable && (owed || rolled)) {
         this.wv.monster = true;
+        this.wv.big = true;
+        game.monsterSeen = true;
         this.wv.A = Math.min(158, 128 + st * 8 + rand() * 18);
         // Phase 4 — the clip moment: the first monster at stage ≥ 2 in an arcade session
         // is a makeable BOMB. Same feathering tell, but it rumbles early (see updateWatch).
@@ -807,7 +824,12 @@ export function makeScenes(game) {
       // you're reacting to. The read is the rumble tick on the SET bar above. It's a shout,
       // not a scoreline, so it draws small. Still worded the same on the session's makeable
       // bomb — naming it here would give away which one is on.
-      if (!this.calledBig && w.monster && w.t >= 0.3) {
+      // Fires on every BIG wave now, not just the monsters. That's deliberate: before this
+      // the shout was a perfect monster oracle — hear it, let the wave go, collect +150 —
+      // which made the SET-bar rumble tick decorative. Now a big normal wave sounds exactly
+      // the same on the horizon, so the callout is what it always claimed to be (the
+      // heads-up) and the rumble timing is the only thing that actually reads it.
+      if (!this.calledBig && (w.monster || w.big) && w.t >= 0.3) {
         this.calledBig = true;
         this.say('OUT DA BACK!', 'BIG SET ON THE HORIZON', 1.6, true);
         // an actual voice if the clip is there, the old horn if it isn't
